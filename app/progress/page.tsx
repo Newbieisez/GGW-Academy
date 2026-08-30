@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { ArrowRight, CircleHelp } from "lucide-react";
-import Link from "next/link";
-import { DashboardView, SiteHeader, type AttemptRow, type ModuleId, type ModuleProgressRow, type OutcomeRow } from "../page";
+import { academyApiUrl, ACADEMY_API_CONFIGURED, DashboardView, GITHUB_PAGES_MODE, readLocalAcademyState, academyPath, writeLocalAcademyState, type AcademyStorageMode, SiteHeader, type AttemptRow, type ModuleId, type ModuleProgressRow, type OutcomeRow } from "../page";
+
+export const dynamic = "force-static";
 
 type WorkProductRow = { kind?: string; title?: string; created_at?: string };
 
@@ -21,6 +22,8 @@ type ProgressPayload = {
 export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [storageMode, setStorageMode] = useState<AcademyStorageMode>("offline");
+  const [hydrated, setHydrated] = useState(false);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [completed, setCompleted] = useState<string[]>([]);
@@ -31,7 +34,27 @@ export default function ProgressPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/academy").then(async (response) => {
+    const hydrateLocal = () => {
+      const local = readLocalAcademyState();
+      if (cancelled) return;
+      setTrackingEnabled(true);
+      setStorageMode("browser");
+      setUserName("GGW learner");
+      setCompleted(local.progress?.completed || []);
+      setModuleProgress(local.moduleProgress || []);
+      setAttempts(local.recentAttempts || []);
+      setOutcomes(local.outcomes || []);
+      setWorkProducts(local.workProducts || []);
+      setHydrated(true);
+      setLoading(false);
+    };
+
+    if (GITHUB_PAGES_MODE && !ACADEMY_API_CONFIGURED) {
+      hydrateLocal();
+      return () => { cancelled = true; };
+    }
+
+    fetch(academyApiUrl("/api/academy")).then(async (response) => {
       const payload = await response.json() as ProgressPayload;
       if (cancelled) return;
       setTrackingEnabled(Boolean(payload.authenticated && payload.tracking?.enabled));
@@ -43,24 +66,36 @@ export default function ProgressPage() {
       setOutcomes(Array.isArray(payload.outcomes) ? payload.outcomes : []);
       setWorkProducts(Array.isArray(payload.workProducts) ? payload.workProducts : []);
       if (payload.authenticated && payload.tracking?.enabled) {
-        void fetch("/api/academy", {
+        void fetch(academyApiUrl("/api/academy"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ activity: { eventName: "dashboard_opened", activityId: "progress-page", metadata: { page: "progress" } } }),
         }).catch(() => undefined);
       }
+      setStorageMode(payload.authenticated && payload.tracking?.enabled ? "cloud" : "offline");
+      setHydrated(true);
       setLoading(false);
     }).catch(() => {
       if (!cancelled) {
-        setTrackingEnabled(false);
-        setLoading(false);
+        hydrateLocal();
       }
     });
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    if (!GITHUB_PAGES_MODE || ACADEMY_API_CONFIGURED || !hydrated) return;
+    writeLocalAcademyState({
+      progress: { view: "dashboard", activeModule: null, activeSandbox: null, step: 0, completed },
+      moduleProgress,
+      recentAttempts: attempts,
+      outcomes,
+      workProducts,
+    });
+  }, [attempts, completed, hydrated, moduleProgress, outcomes, workProducts]);
+
   const openModule = (moduleId: ModuleId) => {
-    window.location.href = "/?module=" + encodeURIComponent(moduleId);
+    window.location.href = academyPath("/?module=" + encodeURIComponent(moduleId));
   };
 
   const saveOutcome = (moduleId: ModuleId, data: { afterMinutes: number | null; confidenceAfter: number | null; notes: string }) => {
@@ -69,8 +104,8 @@ export default function ProgressPage() {
     const now = new Date().toISOString();
     setOutcomes((existing) => [{ module_id: moduleId, commitment_text: current?.commitment_text, due_at: current?.due_at, status: "completed", baseline_minutes: current?.baseline_minutes, after_minutes: data.afterMinutes, confidence_before: current?.confidence_before, confidence_after: data.confidenceAfter, notes: data.notes, updated_at: now }, ...existing.filter((outcome) => outcome.module_id !== moduleId)]);
     setModuleProgress((existing) => [{ ...row, module_id: moduleId, status: row?.status || "in_progress", current_step: 3, best_score: row?.best_score || 0, attempts: row?.attempts || 0, lab_passed: row?.lab_passed || 0, artifact_saved: row?.artifact_saved || 0, commitment_status: "completed", commitment_due_at: row?.commitment_due_at || current?.due_at || null, last_activity_at: now }, ...existing.filter((item) => item.module_id !== moduleId)]);
-    if (!trackingEnabled) return;
-    void fetch("/api/academy", {
+    if (!trackingEnabled || (GITHUB_PAGES_MODE && !ACADEMY_API_CONFIGURED)) return;
+    void fetch(academyApiUrl("/api/academy"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -81,5 +116,5 @@ export default function ProgressPage() {
     }).catch(() => undefined);
   };
 
-  return <div className="academy-app"><SiteHeader view="dashboard" onHome={() => { window.location.href = "/"; }} onPrompts={() => { window.location.href = "/prompts"; }} onSandbox={() => { window.location.href = "/?view=sandbox"; }} onDashboard={() => window.scrollTo({ top: 0, behavior: "smooth" })} />{loading ? <main className="page-shell dashboard-page"><section className="simple-hero dashboard-hero"><p className="eyebrow">Your learning record</p><h1>Loading your progress…</h1><p>Connecting to your saved learning record.</p></section></main> : <DashboardView userName={userName} userEmail={userEmail} trackingEnabled={trackingEnabled} completed={completed} moduleProgress={moduleProgress} attempts={attempts} outcomes={outcomes} workProducts={workProducts} isAdmin={false} onOpenModule={openModule} onOpenAdmin={() => undefined} onSaveOutcome={saveOutcome} />}{!loading && !trackingEnabled && <div className="progress-route-note"><CircleHelp size={15} /><span>You can still practice here. To create a durable record, open the private site through an approved authenticated account.</span><Link href="/">Return home <ArrowRight size={14} /></Link></div>}</div>;
+  return <div className="academy-app"><SiteHeader view="dashboard" onHome={() => { window.location.href = academyPath("/"); }} onPrompts={() => { window.location.href = academyPath("/prompts"); }} onSandbox={() => { window.location.href = academyPath("/?view=sandbox"); }} onDashboard={() => window.scrollTo({ top: 0, behavior: "smooth" })} />{loading ? <main className="page-shell dashboard-page"><section className="simple-hero dashboard-hero"><p className="eyebrow">Your learning record</p><h1>Loading your progress…</h1><p>Connecting to your saved learning record.</p></section></main> : <DashboardView userName={userName} userEmail={userEmail} trackingEnabled={trackingEnabled} storageMode={storageMode} completed={completed} moduleProgress={moduleProgress} attempts={attempts} outcomes={outcomes} workProducts={workProducts} isAdmin={false} onOpenModule={openModule} onOpenAdmin={() => undefined} onSaveOutcome={saveOutcome} />}{!loading && !trackingEnabled && <div className="progress-route-note"><CircleHelp size={15} /><span>You can still practice here. To create a durable record, open the private site through an approved authenticated account.</span><a href={academyPath("/")}>Return home <ArrowRight size={14} /></a></div>}</div>;
 }

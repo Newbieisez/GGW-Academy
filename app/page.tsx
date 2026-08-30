@@ -26,12 +26,92 @@ import {
   Video,
 } from "lucide-react";
 
+// GitHub Pages exports this client-rendered experience as static HTML. The
+// hosted deployment keeps the same page interactive through the normal
+// runtime, while this directive tells vinext that no request-time data is
+// needed to render the shell.
+export const dynamic = "force-static";
+
 type AppView = "home" | "prompts" | "sandbox" | "module" | "dashboard" | "admin";
 export type ModuleId = "daily" | "data" | "visuals" | "automation" | "agents" | "governance";
 type SandboxId = "sheets" | "drive" | "docs" | "gmail";
 type SaveState = "connecting" | "connected" | "saving" | "offline";
+export type AcademyStorageMode = "cloud" | "browser" | "offline";
 type WorkProduct = { kind: string; title: string; content: unknown };
 const sandboxModuleMap: Record<SandboxId, ModuleId> = { sheets: "data", drive: "governance", docs: "daily", gmail: "daily" };
+
+export const GITHUB_PAGES_MODE = process.env.NEXT_PUBLIC_GGW_STATIC === "true";
+const PUBLIC_BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
+const ACADEMY_API_BASE = (process.env.NEXT_PUBLIC_ACADEMY_API_BASE || "").replace(/\/$/, "");
+const GEMINI_API_ENDPOINT = (process.env.NEXT_PUBLIC_GEMINI_API_URL || "").replace(/\/$/, "");
+export const ACADEMY_API_CONFIGURED = Boolean(ACADEMY_API_BASE);
+const REMOTE_ACADEMY_ENABLED = !GITHUB_PAGES_MODE || ACADEMY_API_CONFIGURED;
+
+export function academyPath(rawPath: string): string {
+  const [rawPathname, query = ""] = rawPath.split("?");
+  const pathname = rawPathname.startsWith("/") ? rawPathname : "/" + rawPathname;
+  const withSlash = GITHUB_PAGES_MODE && pathname !== "/" && !pathname.endsWith("/") ? pathname + "/" : pathname;
+  return `${PUBLIC_BASE_PATH}${withSlash}${query ? "?" + query : ""}` || "/";
+}
+
+export function academyApiUrl(path: string): string {
+  return `${ACADEMY_API_BASE || (GITHUB_PAGES_MODE ? PUBLIC_BASE_PATH : "")}${path}`;
+}
+
+export type LocalAcademyState = {
+  progress?: { view?: AppView; activeModule?: ModuleId | null; activeSandbox?: SandboxId | null; step?: number; completed?: string[] };
+  moduleProgress?: ModuleProgressRow[];
+  recentAttempts?: AttemptRow[];
+  outcomes?: OutcomeRow[];
+  workProducts?: Array<{ kind?: string; title?: string; created_at?: string }>;
+};
+
+const LOCAL_ACADEMY_STORAGE_KEY = "ggw-ai-academy-progress-v2";
+
+export function readLocalAcademyState(): LocalAcademyState {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = window.localStorage.getItem(LOCAL_ACADEMY_STORAGE_KEY);
+    if (!saved) return {};
+    const parsed = JSON.parse(saved) as LocalAcademyState;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeLocalAcademyState(state: LocalAcademyState): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LOCAL_ACADEMY_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Browser storage can be disabled or full; the learning activity remains usable.
+  }
+}
+
+function localCoachReply(question: string, activeModuleId?: ModuleId): string {
+  const normalized = question.toLowerCase();
+  const moduleHint = activeModuleId ? ` You are currently on the ${moduleTitle(activeModuleId)} path.` : "";
+  if (normalized.includes("sheet") || normalized.includes("finance") || normalized.includes("990") || normalized.includes("receipt")) {
+    return `Start with a copy of the source Sheet, then ask for one structured pass: standardize dates to YYYY-MM-DD, assign Program Services, Management & General, or Fundraising, and flag missing vendor detail or amounts over $1,000 as Requires Receipt/Audit. Check every uncertain row against the source and have GGW's finance owner make the final decision.${moduleHint}`;
+  }
+  if (normalized.includes("notebook") || normalized.includes("source") || normalized.includes("drive") || normalized.includes("file")) {
+    return `Choose the current approved source before asking AI anything. Record the owner, last-updated date, shared location, and access status. In NotebookLM, ask it to use only the selected sources, show citations, and say when the sources disagree or do not answer the question.${moduleHint}`;
+  }
+  if (normalized.includes("email") || normalized.includes("gmail") || normalized.includes("draft")) {
+    return `Ask for a draft or summary with a fixed shape: decision, open questions, action items with owners and dates, and CHECK BEFORE SHARING. Then compare names, dates, links, amounts, recipients, and attachments with the original before sending anything.${moduleHint}`;
+  }
+  if (normalized.includes("image") || normalized.includes("video") || normalized.includes("slide") || normalized.includes("vid")) {
+    return `Write the one-sentence audience message and list approved facts before generating a visual. Ask for the visual purpose, accessibility description, scene or slide structure, and [CHECK] markers. Review claims, representation, captions, voiceover, links, and brand fit before publication.${moduleHint}`;
+  }
+  if (normalized.includes("script") || normalized.includes("automat") || normalized.includes("form")) {
+    return `Start with a draft-first workflow: Trigger, Validate, Build, Draft, Log. Test with fictional data, required-field failures, duplicates, and permission errors. Keep email in draft mode until a named owner approves the recipients and message.${moduleHint}`;
+  }
+  if (normalized.includes("spark") || normalized.includes("agent") || normalized.includes("autonomous") || normalized.includes("monitor")) {
+    return `Use O-R-E-G: Observe only named sources, Reason with visible evidence, Execute reversible preparation, and Gate every send, edit, share, delete, purchase, or permission change behind human confirmation. A schedule is not permission to act without limits.${moduleHint}`;
+  }
+  return `Pick one real outcome, name the source, and ask for a small first draft with a clear output format. Then verify the result against the source before sharing it. Try asking “How do I use Gemini in Sheets?” or “How do I check an AI draft?”${moduleHint}`;
+}
 export type ModuleProgressRow = {
   module_id?: string;
   status?: string;
@@ -758,15 +838,17 @@ type GeminiChatMessage = { role: "user" | "assistant"; text: string };
 
 export function GeminiChatBox({ activeModuleId, trackingEnabled }: { activeModuleId?: ModuleId; trackingEnabled: boolean }) {
   const suggestions = ["What should I do next?", "How do I use Gemini in Sheets?", "How do I check an AI draft?"];
+  const staticCoach = GITHUB_PAGES_MODE && !GEMINI_API_ENDPOINT;
+  const coachLabel = staticCoach ? "Academy coach · GitHub Pages mode" : "Gemini coach · just in time";
   const [messages, setMessages] = useState<GeminiChatMessage[]>([
-    { role: "assistant", text: "Ask me about the learning path you are working on. I will give you a short next step and a review point." },
+    { role: "assistant", text: staticCoach ? "Ask me about your learning path. I will give you a practical next step and a review point. This GitHub-hosted build uses built-in academy guidance until a secure Gemini endpoint is connected." : "Ask me about the learning path you are working on. I will give you a short next step and a review point." },
   ]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
 
   const recordQuestion = (configured: boolean) => {
-    if (!trackingEnabled) return;
-    fetch("/api/academy", {
+    if (!trackingEnabled || !REMOTE_ACADEMY_ENABLED) return;
+    fetch(academyApiUrl("/api/academy"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -787,7 +869,12 @@ export function GeminiChatBox({ activeModuleId, trackingEnabled }: { activeModul
     setDraft("");
     setBusy(true);
     try {
-      const response = await fetch("/api/gemini", {
+      if (staticCoach) {
+        setMessages((current) => [...current, { role: "assistant", text: localCoachReply(question, activeModuleId) }]);
+        recordQuestion(false);
+        return;
+      }
+      const response = await fetch(GEMINI_API_ENDPOINT || "/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: question, context: { page: "progress", moduleId: activeModuleId } }),
@@ -804,16 +891,17 @@ export function GeminiChatBox({ activeModuleId, trackingEnabled }: { activeModul
     }
   };
 
-  return <section className="gemini-chat-card" aria-labelledby="progress-gemini-heading"><div className="gemini-chat-intro"><span className="gemini-chat-icon"><Sparkles size={21} /></span><div><p className="eyebrow">Gemini coach · just in time</p><h2 id="progress-gemini-heading">Ask while you work.</h2><p>Get a plain-language next step, a prompt idea, or a reminder about what to review before you share the result.</p></div></div><div className="chat-suggestions" aria-label="Suggested questions">{suggestions.map((suggestion) => <button key={suggestion} type="button" onClick={() => void ask(suggestion)} disabled={busy}>{suggestion}</button>)}</div><div className="chat-thread" aria-live="polite">{messages.map((message, index) => <div className={"chat-message " + message.role} key={message.role + index}><span>{message.role === "user" ? "You" : "Gemini coach"}</span><p>{message.text}</p></div>)}{busy && <div className="chat-message assistant"><span>Gemini coach</span><p className="chat-thinking">Thinking…</p></div>}</div><form className="chat-form" onSubmit={(event) => { event.preventDefault(); void ask(); }}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask a Google Workspace question" aria-label="Ask Gemini a question" maxLength={2000} /><button className="brand-button" type="submit" disabled={!draft.trim() || busy}><Send size={14} />{busy ? "Thinking…" : "Ask Gemini"}</button></form><p className="privacy-note"><ShieldCheck size={14} /> This coach receives your question and the selected learning path only. It cannot see GGW Drive, Gmail, or saved documents, and the question text is not saved in the learner record.</p></section>;
+  return <section className="gemini-chat-card" aria-labelledby="progress-gemini-heading"><div className="gemini-chat-intro"><span className="gemini-chat-icon"><Sparkles size={21} /></span><div><p className="eyebrow">{coachLabel}</p><h2 id="progress-gemini-heading">Ask while you work.</h2><p>Get a plain-language next step, a prompt idea, or a reminder about what to review before you share the result.</p></div></div><div className="chat-suggestions" aria-label="Suggested questions">{suggestions.map((suggestion) => <button key={suggestion} type="button" onClick={() => void ask(suggestion)} disabled={busy}>{suggestion}</button>)}</div><div className="chat-thread" aria-live="polite">{messages.map((message, index) => <div className={"chat-message " + message.role} key={message.role + index}><span>{message.role === "user" ? "You" : staticCoach ? "Academy coach" : "Gemini coach"}</span><p>{message.text}</p></div>)}{busy && <div className="chat-message assistant"><span>{staticCoach ? "Academy coach" : "Gemini coach"}</span><p className="chat-thinking">Thinking…</p></div>}</div><form className="chat-form" onSubmit={(event) => { event.preventDefault(); void ask(); }}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={staticCoach ? "Ask the academy coach a question" : "Ask a Google Workspace question"} aria-label="Ask Gemini a question" maxLength={2000} /><button className="brand-button" type="submit" disabled={!draft.trim() || busy}><Send size={14} />{busy ? "Thinking…" : "Ask Gemini"}</button></form><p className="privacy-note"><ShieldCheck size={14} /> This coach receives your question and the selected learning path only. It cannot see GGW Drive, Gmail, or saved documents, and the question text is not saved in the learner record.</p></section>;
 }
 
-export function DashboardView({ userName, userEmail, trackingEnabled, completed, moduleProgress, attempts, outcomes, workProducts, isAdmin, onOpenModule, onOpenAdmin, onSaveOutcome }: { userName: string; userEmail?: string; trackingEnabled: boolean; completed: string[]; moduleProgress: ModuleProgressRow[]; attempts: AttemptRow[]; outcomes: OutcomeRow[]; workProducts: Array<{ kind?: string; title?: string; created_at?: string }>; isAdmin: boolean; onOpenModule: (id: ModuleId) => void; onOpenAdmin: () => void; onSaveOutcome: (moduleId: ModuleId, data: { afterMinutes: number | null; confidenceAfter: number | null; notes: string }) => void }) {
+export function DashboardView({ userName, userEmail, trackingEnabled, storageMode = trackingEnabled ? "cloud" : "offline", completed, moduleProgress, attempts, outcomes, workProducts, isAdmin, onOpenModule, onOpenAdmin, onSaveOutcome }: { userName: string; userEmail?: string; trackingEnabled: boolean; storageMode?: AcademyStorageMode; completed: string[]; moduleProgress: ModuleProgressRow[]; attempts: AttemptRow[]; outcomes: OutcomeRow[]; workProducts: Array<{ kind?: string; title?: string; created_at?: string }>; isAdmin: boolean; onOpenModule: (id: ModuleId) => void; onOpenAdmin: () => void; onSaveOutcome: (moduleId: ModuleId, data: { afterMinutes: number | null; confidenceAfter: number | null; notes: string }) => void }) {
   const completedModules = modules.filter((module) => completed.includes(module.id) || moduleProgress.some((row) => row.module_id === module.id && row.status === "completed"));
   const nextModule = modules.find((module) => !completedModules.some((done) => done.id === module.id)) || modules[0];
   const nextRow = moduleProgress.find((row) => row.module_id === nextModule.id);
   const latestAttempt = attempts[0];
   const openOutcomes = outcomes.filter((outcome) => outcome.status !== "completed" && outcome.status !== "done");
-  return <main className="page-shell dashboard-page"><section className="simple-hero dashboard-hero"><p className="eyebrow">Your learning record</p><h1>Keep the useful work moving.</h1><p>{userName ? "Welcome back, " + userName.split(" ")[0] + ". " : ""}Your progress, practice results, saved artifacts, and 24-hour commitments live here so you can pick up where you left off.</p>{!trackingEnabled && <div className="tracking-warning"><Info size={16} /><span>This session is in practice mode. Sign in through the approved GGW account to save progress across devices.</span></div>}</section><section className="account-panel"><div className="account-panel-icon"><ShieldCheck size={21} /></div><div className="account-panel-copy"><p className="eyebrow">How your record works</p><h2>One verified account. One learning record.</h2><p>The academy uses the authenticated account supplied by the private site. It never treats a typed email address as proof of identity.</p></div><div className="account-status"><span>{trackingEnabled ? "Verified account connected" : "No verified account connected"}</span><strong>{trackingEnabled && userEmail ? userEmail : "Sign in to save your work"}</strong><small>{trackingEnabled ? "Your activity can be tied to this learner record." : "You can practice, but this session will not be saved."}</small></div></section><section className="progress-overview"><div className="progress-score"><span className="eyebrow">Course progress</span><strong>{completedModules.length}<small>/6</small></strong><span>learning paths complete</span></div><div className="progress-meter"><div className="progress-meter-head"><span>Six practical paths</span><b>{Math.round((completedModules.length / modules.length) * 100)}%</b></div><div className="progress-track"><span style={{ width: (completedModules.length / modules.length) * 100 + "%" }} /></div><p>Each path combines a real GGW friction point, a diagnostic, a safe practice task, and a 24-hour commitment.</p></div><div className="progress-signal"><span className="eyebrow">Latest evidence</span><strong>{latestAttempt?.score !== null && latestAttempt?.score !== undefined ? numberValue(latestAttempt.score) + "%" : "—"}</strong><span>{latestAttempt ? moduleTitle(latestAttempt.module_id) : "Complete a diagnostic to see a result."}</span></div></section><GeminiChatBox activeModuleId={nextModule.id} trackingEnabled={trackingEnabled} /><section className="continue-card"><div><p className="eyebrow">Next best step</p><h2>{nextRow?.status === "in_progress" ? "Resume " : "Start "}{nextModule.title}</h2><p>{nextModule.description}</p>{nextRow?.status === "in_progress" && <span className="resume-detail">Saved at {formatActivityDate(nextRow.last_activity_at)} · {nextRow.current_step ? "Step " + nextRow.current_step + " of 3" : "Lesson started"}</span>}</div><button className="brand-button" onClick={() => onOpenModule(nextModule.id)}>{nextRow?.status === "in_progress" ? "Resume path" : "Start path"} <ArrowRight size={15} /></button></section><section className="dashboard-section"><div className="section-heading"><div><p className="eyebrow">Your six paths</p><h2>See exactly what is next.</h2></div><span className="section-note">Progress saves as you practice.</span></div><div className="progress-list">{modules.map((module) => { const row = moduleProgress.find((item) => item.module_id === module.id); const done = completed.includes(module.id) || row?.status === "completed"; const status = done ? "Complete" : row?.status === "in_progress" ? "In progress" : "Not started"; return <article className="progress-row" key={module.id}><span className={"progress-row-icon " + module.color}>{iconFor(module.icon, 19)}</span><div className="progress-row-main"><strong>{module.title}</strong><span>{module.tools}</span></div><span className={"progress-status " + status.toLowerCase().replace(" ", "-")}>{status}</span><span className="progress-row-stat">{row && numberValue(row.best_score) ? numberValue(row.best_score) + "% best" : row && numberValue(row.attempts) ? numberValue(row.attempts) + " attempt" + (numberValue(row.attempts) === 1 ? "" : "s") : "Ready when you are"}</span><button className="row-action" onClick={() => onOpenModule(module.id)}>{done ? "Review" : row?.status === "in_progress" ? "Resume" : "Start"} <ChevronRight size={15} /></button></article>; })}</div></section><section className="dashboard-columns"><div className="dashboard-panel"><div className="panel-heading"><div><p className="eyebrow">Evidence you created</p><h2>Saved work</h2></div><span className="panel-count">{workProducts.length}</span></div>{workProducts.length ? <div className="evidence-list">{workProducts.slice(0, 6).map((item, index) => <div className="evidence-item" key={(item.kind || "item") + (item.title || "") + index}><span className="evidence-dot"><Check size={13} /></span><div><strong>{item.title || "Saved work item"}</strong><span>{item.kind || "Practice artifact"} · {formatActivityDate(item.created_at)}</span></div></div>)}</div> : <div className="panel-empty"><Sparkles size={18} /><span>Save a module prompt or finish a sandbox exercise and it will appear here.</span></div>}<p className="privacy-note"><ShieldCheck size={14} /> The tracker stores short activity metadata and your saved artifact summary—not raw Drive files.</p></div><div className="dashboard-panel"><div className="panel-heading"><div><p className="eyebrow">Applied learning</p><h2>24-hour commitments</h2></div><span className="panel-count">{openOutcomes.length}</span></div>{outcomes.length ? <div className="commitment-list">{outcomes.slice(0, 5).map((outcome, index) => outcome.module_id ? <OutcomeCheckin key={(outcome.module_id || "module") + index} outcome={outcome} onSave={(data) => onSaveOutcome(outcome.module_id as ModuleId, data)} /> : null)}</div> : <div className="panel-empty"><CircleHelp size={18} /><span>Commit to one small task inside a module. The due date and follow-up result will be tracked here.</span></div>}<p className="privacy-note"><Info size={14} /> Use the commitment as a work experiment: record what changed, not private client or donor information.</p></div></section>{isAdmin && <section className="leadership-link-card"><div><p className="eyebrow">GGW leadership</p><h2>See aggregate adoption signals.</h2><p>Review participation, completion, attempt quality, and commitment status without exposing individual work content.</p></div><button className="quiet-button" onClick={onOpenAdmin}>Open leadership view <ArrowRight size={15} /></button></section>}</main>;
+  const browserMode = storageMode === "browser";
+  return <main className="page-shell dashboard-page"><section className="simple-hero dashboard-hero"><p className="eyebrow">Your learning record</p><h1>Keep the useful work moving.</h1><p>{userName ? "Welcome back, " + userName.split(" ")[0] + ". " : ""}Your progress, practice results, saved artifacts, and 24-hour commitments live here so you can pick up where you left off.</p>{browserMode ? <div className="tracking-warning"><Info size={16} /><span>This GitHub-hosted build saves progress in this browser. Use the same browser to pick up where you left off.</span></div> : !trackingEnabled && <div className="tracking-warning"><Info size={16} /><span>This session is in practice mode. Sign in through the approved GGW account to save progress across devices.</span></div>}</section><section className="account-panel"><div className="account-panel-icon"><ShieldCheck size={21} /></div><div className="account-panel-copy"><p className="eyebrow">How your record works</p><h2>{browserMode ? "One browser. One learning record." : "One verified account. One learning record."}</h2><p>{browserMode ? "GitHub Pages cannot verify a Google account or run a private database. Your practice record is saved on this device until a secure backend is connected." : "The academy uses the authenticated account supplied by the private site. It never treats a typed email address as proof of identity."}</p></div><div className="account-status"><span>{browserMode ? "Browser save connected" : trackingEnabled ? "Verified account connected" : "No verified account connected"}</span><strong>{browserMode ? "This device" : trackingEnabled && userEmail ? userEmail : "Sign in to save your work"}</strong><small>{browserMode ? "Progress is not shared across devices or learners." : trackingEnabled ? "Your activity can be tied to this learner record." : "You can practice, but this session will not be saved."}</small></div></section><section className="progress-overview"><div className="progress-score"><span className="eyebrow">Course progress</span><strong>{completedModules.length}<small>/6</small></strong><span>learning paths complete</span></div><div className="progress-meter"><div className="progress-meter-head"><span>Six practical paths</span><b>{Math.round((completedModules.length / modules.length) * 100)}%</b></div><div className="progress-track"><span style={{ width: (completedModules.length / modules.length) * 100 + "%" }} /></div><p>Each path combines a real GGW friction point, a diagnostic, a safe practice task, and a 24-hour commitment.</p></div><div className="progress-signal"><span className="eyebrow">Latest evidence</span><strong>{latestAttempt?.score !== null && latestAttempt?.score !== undefined ? numberValue(latestAttempt.score) + "%" : "—"}</strong><span>{latestAttempt ? moduleTitle(latestAttempt.module_id) : "Complete a diagnostic to see a result."}</span></div></section><GeminiChatBox activeModuleId={nextModule.id} trackingEnabled={trackingEnabled} /><section className="continue-card"><div><p className="eyebrow">Next best step</p><h2>{nextRow?.status === "in_progress" ? "Resume " : "Start "}{nextModule.title}</h2><p>{nextModule.description}</p>{nextRow?.status === "in_progress" && <span className="resume-detail">Saved at {formatActivityDate(nextRow.last_activity_at)} · {nextRow.current_step ? "Step " + nextRow.current_step + " of 3" : "Lesson started"}</span>}</div><button className="brand-button" onClick={() => onOpenModule(nextModule.id)}>{nextRow?.status === "in_progress" ? "Resume path" : "Start path"} <ArrowRight size={15} /></button></section><section className="dashboard-section"><div className="section-heading"><div><p className="eyebrow">Your six paths</p><h2>See exactly what is next.</h2></div><span className="section-note">Progress saves as you practice.</span></div><div className="progress-list">{modules.map((module) => { const row = moduleProgress.find((item) => item.module_id === module.id); const done = completed.includes(module.id) || row?.status === "completed"; const status = done ? "Complete" : row?.status === "in_progress" ? "In progress" : "Not started"; return <article className="progress-row" key={module.id}><span className={"progress-row-icon " + module.color}>{iconFor(module.icon, 19)}</span><div className="progress-row-main"><strong>{module.title}</strong><span>{module.tools}</span></div><span className={"progress-status " + status.toLowerCase().replace(" ", "-")}>{status}</span><span className="progress-row-stat">{row && numberValue(row.best_score) ? numberValue(row.best_score) + "% best" : row && numberValue(row.attempts) ? numberValue(row.attempts) + " attempt" + (numberValue(row.attempts) === 1 ? "" : "s") : "Ready when you are"}</span><button className="row-action" onClick={() => onOpenModule(module.id)}>{done ? "Review" : row?.status === "in_progress" ? "Resume" : "Start"} <ChevronRight size={15} /></button></article>; })}</div></section><section className="dashboard-columns"><div className="dashboard-panel"><div className="panel-heading"><div><p className="eyebrow">Evidence you created</p><h2>Saved work</h2></div><span className="panel-count">{workProducts.length}</span></div>{workProducts.length ? <div className="evidence-list">{workProducts.slice(0, 6).map((item, index) => <div className="evidence-item" key={(item.kind || "item") + (item.title || "") + index}><span className="evidence-dot"><Check size={13} /></span><div><strong>{item.title || "Saved work item"}</strong><span>{item.kind || "Practice artifact"} · {formatActivityDate(item.created_at)}</span></div></div>)}</div> : <div className="panel-empty"><Sparkles size={18} /><span>Save a module prompt or finish a sandbox exercise and it will appear here.</span></div>}<p className="privacy-note"><ShieldCheck size={14} /> The tracker stores short activity metadata and your saved artifact summary—not raw Drive files.</p></div><div className="dashboard-panel"><div className="panel-heading"><div><p className="eyebrow">Applied learning</p><h2>24-hour commitments</h2></div><span className="panel-count">{openOutcomes.length}</span></div>{outcomes.length ? <div className="commitment-list">{outcomes.slice(0, 5).map((outcome, index) => outcome.module_id ? <OutcomeCheckin key={(outcome.module_id || "module") + index} outcome={outcome} onSave={(data) => onSaveOutcome(outcome.module_id as ModuleId, data)} /> : null)}</div> : <div className="panel-empty"><CircleHelp size={18} /><span>Commit to one small task inside a module. The due date and follow-up result will be tracked here.</span></div>}<p className="privacy-note"><Info size={14} /> Use the commitment as a work experiment: record what changed, not private client or donor information.</p></div></section>{isAdmin && <section className="leadership-link-card"><div><p className="eyebrow">GGW leadership</p><h2>See aggregate adoption signals.</h2><p>Review participation, completion, attempt quality, and commitment status without exposing individual work content.</p></div><button className="quiet-button" onClick={onOpenAdmin}>Open leadership view <ArrowRight size={15} /></button></section>}</main>;
 }
 
 function AdminDashboardView({ admin, error, onBack }: { admin?: AdminOverview; error?: string; onBack: () => void }) {
@@ -862,6 +950,8 @@ export default function Home() {
   const [savedCount, setSavedCount] = useState(0);
   const [notice, setNotice] = useState("");
   const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [storageMode, setStorageMode] = useState<AcademyStorageMode>("offline");
+  const [hydrated, setHydrated] = useState(false);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -875,11 +965,8 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/academy").then(async (response) => {
-      const payload = await response.json() as { authenticated?: boolean; tracking?: { enabled?: boolean }; user?: { user_email?: string; display_name?: string }; isAdmin?: boolean; progress?: { completed?: string[]; view?: AppView; activeModule?: ModuleId; activeSandbox?: SandboxId; step?: number }; workProducts?: Array<{ kind?: string; title?: string; created_at?: string }>; moduleProgress?: ModuleProgressRow[]; recentAttempts?: AttemptRow[]; outcomes?: OutcomeRow[] };
-      if (!response.ok) throw new Error("Unable to load the learning record.");
+    const hydrate = (payload: { authenticated?: boolean; tracking?: { enabled?: boolean }; user?: { user_email?: string; display_name?: string }; isAdmin?: boolean; progress?: { completed?: string[]; view?: AppView; activeModule?: ModuleId; activeSandbox?: SandboxId; step?: number }; workProducts?: Array<{ kind?: string; title?: string; created_at?: string }>; moduleProgress?: ModuleProgressRow[]; recentAttempts?: AttemptRow[]; outcomes?: OutcomeRow[] }, mode: AcademyStorageMode) => {
       if (cancelled) return;
-      if (!payload.authenticated || !payload.tracking?.enabled) { setSaveState("offline"); return; }
       const progress = payload.progress || {};
       const query = new URLSearchParams(window.location.search);
       const queryModule = query.get("module");
@@ -896,7 +983,7 @@ export default function Home() {
       else if (progress.activeModule) setActiveModule(progress.activeModule);
       if (requestedView === "sandbox") setActiveSandbox(null);
       else if (progress.activeSandbox) setActiveSandbox(progress.activeSandbox);
-      setUserName(payload.user?.display_name || "");
+      setUserName(payload.user?.display_name || (mode === "browser" ? "GGW learner" : ""));
       setUserEmail(payload.user?.user_email || "");
       setIsAdmin(Boolean(payload.isAdmin));
       setModuleProgress(Array.isArray(payload.moduleProgress) ? payload.moduleProgress : []);
@@ -904,11 +991,47 @@ export default function Home() {
       setOutcomes(Array.isArray(payload.outcomes) ? payload.outcomes : []);
       setWorkProducts(Array.isArray(payload.workProducts) ? payload.workProducts : []);
       setSavedCount(Array.isArray(payload.workProducts) ? payload.workProducts.length : 0);
-      setTrackingEnabled(true);
-      setSaveState("connected");
-    }).catch(() => { if (!cancelled) setSaveState("offline"); });
+      setTrackingEnabled(mode !== "offline");
+      setStorageMode(mode);
+      setSaveState(mode === "offline" ? "offline" : "connected");
+      setHydrated(true);
+    };
+
+    if (!REMOTE_ACADEMY_ENABLED) {
+      const local = readLocalAcademyState();
+      hydrate({
+        progress: local.progress,
+        moduleProgress: local.moduleProgress,
+        recentAttempts: local.recentAttempts,
+        outcomes: local.outcomes,
+        workProducts: local.workProducts,
+      }, "browser");
+      return () => { cancelled = true; };
+    }
+
+    fetch(academyApiUrl("/api/academy")).then(async (response) => {
+      const payload = await response.json() as { authenticated?: boolean; tracking?: { enabled?: boolean }; user?: { user_email?: string; display_name?: string }; isAdmin?: boolean; progress?: { completed?: string[]; view?: AppView; activeModule?: ModuleId; activeSandbox?: SandboxId; step?: number }; workProducts?: Array<{ kind?: string; title?: string; created_at?: string }>; moduleProgress?: ModuleProgressRow[]; recentAttempts?: AttemptRow[]; outcomes?: OutcomeRow[] };
+      if (!response.ok) throw new Error("Unable to load the learning record.");
+      if (!payload.authenticated || !payload.tracking?.enabled) { hydrate({}, "offline"); return; }
+      hydrate(payload, "cloud");
+    }).catch(() => {
+      if (!cancelled) {
+        hydrate(readLocalAcademyState(), "browser");
+      }
+    });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!GITHUB_PAGES_MODE || ACADEMY_API_BASE || !hydrated) return;
+    writeLocalAcademyState({
+      progress: { ...progressMeta, completed },
+      moduleProgress,
+      recentAttempts: attempts,
+      outcomes,
+      workProducts,
+    });
+  }, [attempts, completed, hydrated, moduleProgress, outcomes, progressMeta, workProducts]);
 
   const applyTrackingState = (event?: TrackingEvent, workProduct?: WorkProduct) => {
     const now = new Date().toISOString();
@@ -927,8 +1050,9 @@ export default function Home() {
 
   const postToAcademy = (body: Record<string, unknown>) => {
     if (!trackingEnabled) { setSaveState("offline"); return; }
+    if (!REMOTE_ACADEMY_ENABLED) { setSaveState("connected"); return; }
     setSaveState("saving");
-    fetch("/api/academy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async (response) => { const payload = await response.json() as { workProductCount?: number; saved?: boolean }; if (!response.ok || !payload.saved) throw new Error("Progress could not be saved."); return payload; }).then((payload) => { setSaveState("connected"); if (typeof payload.workProductCount === "number") setSavedCount(payload.workProductCount); }).catch(() => setSaveState("offline"));
+    fetch(academyApiUrl("/api/academy"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async (response) => { const payload = await response.json() as { workProductCount?: number; saved?: boolean }; if (!response.ok || !payload.saved) throw new Error("Progress could not be saved."); return payload; }).then((payload) => { setSaveState("connected"); if (typeof payload.workProductCount === "number") setSavedCount(payload.workProductCount); }).catch(() => setSaveState("offline"));
   };
 
   const saveProgress = (overrides: Partial<{ view: AppView; activeModule: ModuleId | null; activeSandbox: SandboxId | null; step: number; completed: string[] }>, workProduct?: WorkProduct, event?: TrackingEvent) => {
@@ -951,15 +1075,15 @@ export default function Home() {
   const openSandboxMenu = () => { setView("sandbox"); setActiveSandbox(null); saveProgress({ view: "sandbox", activeModule: null, activeSandbox: null, step: 0 }, undefined, { eventName: "sandbox_opened", activityId: "navigation" }); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const openSandbox = (id: SandboxId) => { setView("sandbox"); setActiveSandbox(id); saveProgress({ view: "sandbox", activeModule: null, activeSandbox: id, step: 0 }, undefined, { eventName: "sandbox_started", activityId: id, metadata: { tool: id } }); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const openModule = (id: ModuleId) => { const row = moduleProgress.find((item) => item.module_id === id); setView("module"); setActiveModule(id); setActiveSandbox(null); saveProgress({ view: "module", activeModule: id, activeSandbox: null, step: numberValue(row?.current_step) }, undefined, { eventName: "module_started", moduleId: id, activityId: "module", metadata: { source: "learning_path" }, moduleProgress: { moduleId: id, status: row?.status === "completed" ? "completed" : "in_progress", currentStep: numberValue(row?.current_step), bestScore: numberValue(row?.best_score), attempts: numberValue(row?.attempts), labPassed: Boolean(numberValue(row?.lab_passed)), artifactSaved: Boolean(numberValue(row?.artifact_saved)), commitmentStatus: row?.commitment_status || "not_started", commitmentDueAt: row?.commitment_due_at || null, completedAt: row?.completed_at || null } }); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const openDashboard = () => { window.location.href = "/progress"; };
-  const openAdmin = () => { setView("admin"); setAdmin(undefined); setAdminError(""); window.scrollTo({ top: 0, behavior: "smooth" }); fetch("/api/academy?mode=admin").then(async (response) => { const payload = await response.json() as { admin?: AdminOverview; error?: string }; if (!response.ok) throw new Error(payload.error || "Leadership view is unavailable."); setAdmin(payload.admin); }).catch((error: unknown) => setAdminError(error instanceof Error ? error.message : "Leadership view is unavailable.")); };
+  const openDashboard = () => { window.location.href = academyPath("/progress"); };
+  const openAdmin = () => { setView("admin"); setAdmin(undefined); setAdminError(""); window.scrollTo({ top: 0, behavior: "smooth" }); if (!REMOTE_ACADEMY_ENABLED) { setAdminError("The GitHub Pages build keeps learner data on each device and does not provide an aggregate leadership database."); return; } fetch(academyApiUrl("/api/academy?mode=admin")).then(async (response) => { const payload = await response.json() as { admin?: AdminOverview; error?: string }; if (!response.ok) throw new Error(payload.error || "Leadership view is unavailable."); setAdmin(payload.admin); }).catch((error: unknown) => setAdminError(error instanceof Error ? error.message : "Leadership view is unavailable.")); };
   const saveOutcome = (moduleId: ModuleId, data: { afterMinutes: number | null; confidenceAfter: number | null; notes: string }) => { const current = outcomes.find((outcome) => outcome.module_id === moduleId); const row = moduleProgress.find((item) => item.module_id === moduleId); setNotice("Result logged for " + moduleTitle(moduleId) + "."); recordEvent({ eventName: "commitment_completed", moduleId, activityId: "outcome-checkin", metadata: { hasAfterMinutes: Boolean(data.afterMinutes), hasConfidenceAfter: Boolean(data.confidenceAfter) }, outcome: { moduleId, commitmentText: current?.commitment_text || modules.find((module) => module.id === moduleId)?.commitment, dueAt: current?.due_at || null, status: "completed", afterMinutes: data.afterMinutes, confidenceAfter: data.confidenceAfter, notes: data.notes }, moduleProgress: { moduleId, status: row?.status || "in_progress", currentStep: 3, bestScore: numberValue(row?.best_score), attempts: numberValue(row?.attempts), labPassed: Boolean(numberValue(row?.lab_passed)), artifactSaved: Boolean(numberValue(row?.artifact_saved)), commitmentStatus: "completed", commitmentDueAt: row?.commitment_due_at || current?.due_at || null, completedAt: row?.completed_at || null } }); };
   const complete = (id: string, product?: WorkProduct, completion?: { diagnosticScore: number; diagnosticAttempts: number; commitmentDueAt: string | null }) => { const next = completed.includes(id) ? completed : [...completed, id]; setCompleted(next); const selectedModule = modules.find((item) => item.id === id); if (selectedModule) { const row = moduleProgress.find((item) => item.module_id === id); const dueAt = completion?.commitmentDueAt || row?.commitment_due_at || null; setNotice(selectedModule.title + " marked complete. Keep the 24-hour commitment in motion."); saveProgress({ completed: next, view: "module", activeModule: id as ModuleId, activeSandbox: null, step: 3 }, { ...(product || {}), kind: product?.kind || "module-completion", title: product?.title || selectedModule.title + " completion", content: product?.content || {} }, { eventName: "module_completed", moduleId: id as ModuleId, activityId: "completion", metadata: { diagnosticScore: completion?.diagnosticScore || numberValue(row?.best_score), hasArtifact: Boolean(product) }, outcome: { moduleId: id as ModuleId, commitmentText: selectedModule.commitment, dueAt, status: "open" }, moduleProgress: { moduleId: id as ModuleId, status: "completed", currentStep: 3, bestScore: completion?.diagnosticScore || numberValue(row?.best_score), attempts: completion?.diagnosticAttempts || numberValue(row?.attempts), labPassed: Boolean(numberValue(row?.lab_passed)), artifactSaved: true, commitmentStatus: "open", commitmentDueAt: dueAt, completedAt: new Date().toISOString() } }); } else { const linkedModuleId = activeSandbox ? sandboxModuleMap[activeSandbox] : undefined; const row = linkedModuleId ? moduleProgress.find((item) => item.module_id === linkedModuleId) : undefined; setNotice("Sandbox result saved to your learning record."); saveProgress({ completed: next, step: 2 }, product, { eventName: "sandbox_completed", moduleId: linkedModuleId, activityId: id, metadata: { passed: true, sandbox: activeSandbox || "unknown" }, moduleProgress: linkedModuleId ? { moduleId: linkedModuleId, status: row?.status === "completed" ? "completed" : "in_progress", currentStep: 2, bestScore: numberValue(row?.best_score), attempts: numberValue(row?.attempts), labPassed: true, artifactSaved: Boolean(numberValue(row?.artifact_saved)), commitmentStatus: row?.commitment_status || "not_started", commitmentDueAt: row?.commitment_due_at || null, completedAt: row?.completed_at || null } : undefined }); } };
   const saveModuleAsset = (product: WorkProduct) => { const row = moduleProgress.find((item) => item.module_id === activeModule); saveProgress({ view: "module", activeModule, activeSandbox: null, step: 2 }, product, { eventName: "artifact_saved", moduleId: activeModule, activityId: "module-asset", metadata: { kind: product.kind }, moduleProgress: { moduleId: activeModule, status: row?.status === "completed" ? "completed" : "in_progress", currentStep: 2, bestScore: numberValue(row?.best_score), attempts: numberValue(row?.attempts), labPassed: Boolean(numberValue(row?.lab_passed)), artifactSaved: true, commitmentStatus: row?.commitment_status || "not_started", commitmentDueAt: row?.commitment_due_at || null, completedAt: row?.completed_at || null } }); };
-  const saveLabel = saveState === "saving" ? "Saving progress…" : saveState === "connected" ? savedCount ? savedCount + " saved work item" + (savedCount === 1 ? "" : "s") : "Progress saved" : saveState === "connecting" ? "Connecting…" : "Practice mode";
+  const saveLabel = saveState === "saving" ? "Saving progress…" : saveState === "connected" ? storageMode === "browser" ? "Saved on this browser" : savedCount ? savedCount + " saved work item" + (savedCount === 1 ? "" : "s") : "Progress saved" : saveState === "connecting" ? "Connecting…" : "Practice mode";
   const activeModuleDefinition = modules.find((module) => module.id === activeModule) || modules[0];
   const activeModuleProgress = moduleProgress.find((row) => row.module_id === activeModule);
   const activeOutcome = outcomes.find((row) => row.module_id === activeModule);
 
-  return <div className="academy-app"><SiteHeader view={view} onHome={goHome} onPrompts={openPrompts} onSandbox={openSandboxMenu} onDashboard={openDashboard} />{notice && <div className="copy-notice" role="status"><CheckCircle2 size={15} />{notice}</div>}<div className="save-status"><span className={"save-dot " + saveState}></span>{saveLabel}</div>{view === "home" && <HomeView completed={completed} onOpenModule={openModule} onOpenPrompts={openPrompts} onOpenSandbox={openSandbox} onCopy={copyText} />}{view === "prompts" && <PromptLibraryView onCopy={copyText} />}{view === "sandbox" && !activeSandbox && <SandboxMenu onOpen={openSandbox} />}{view === "sandbox" && activeSandbox && <SandboxView key={activeSandbox} sandboxId={activeSandbox} onBack={openSandboxMenu} onCopy={copyText} onComplete={complete} />}{view === "module" && <ModuleView key={activeModuleDefinition.id} module={activeModuleDefinition} completed={completed} moduleProgress={activeModuleProgress} outcome={activeOutcome} onBack={goHome} onCopy={copyText} onOpenSandbox={openSandbox} onComplete={complete} onSaveProduct={saveModuleAsset} onRecordEvent={recordEvent} />}{view === "dashboard" && <DashboardView userName={userName} userEmail={userEmail} trackingEnabled={trackingEnabled} completed={completed} moduleProgress={moduleProgress} attempts={attempts} outcomes={outcomes} workProducts={workProducts} isAdmin={isAdmin} onOpenModule={openModule} onOpenAdmin={openAdmin} onSaveOutcome={saveOutcome} />}{view === "admin" && <AdminDashboardView admin={admin} error={adminError} onBack={openDashboard} />}</div>;
+  return <div className="academy-app"><SiteHeader view={view} onHome={goHome} onPrompts={openPrompts} onSandbox={openSandboxMenu} onDashboard={openDashboard} />{notice && <div className="copy-notice" role="status"><CheckCircle2 size={15} />{notice}</div>}<div className="save-status"><span className={"save-dot " + saveState}></span>{saveLabel}</div>{view === "home" && <HomeView completed={completed} onOpenModule={openModule} onOpenPrompts={openPrompts} onOpenSandbox={openSandbox} onCopy={copyText} />}{view === "prompts" && <PromptLibraryView onCopy={copyText} />}{view === "sandbox" && !activeSandbox && <SandboxMenu onOpen={openSandbox} />}{view === "sandbox" && activeSandbox && <SandboxView key={activeSandbox} sandboxId={activeSandbox} onBack={openSandboxMenu} onCopy={copyText} onComplete={complete} />}{view === "module" && <ModuleView key={activeModuleDefinition.id} module={activeModuleDefinition} completed={completed} moduleProgress={activeModuleProgress} outcome={activeOutcome} onBack={goHome} onCopy={copyText} onOpenSandbox={openSandbox} onComplete={complete} onSaveProduct={saveModuleAsset} onRecordEvent={recordEvent} />}{view === "dashboard" && <DashboardView userName={userName} userEmail={userEmail} trackingEnabled={trackingEnabled} storageMode={storageMode} completed={completed} moduleProgress={moduleProgress} attempts={attempts} outcomes={outcomes} workProducts={workProducts} isAdmin={isAdmin} onOpenModule={openModule} onOpenAdmin={openAdmin} onSaveOutcome={saveOutcome} />}{view === "admin" && <AdminDashboardView admin={admin} error={adminError} onBack={openDashboard} />}</div>;
 }

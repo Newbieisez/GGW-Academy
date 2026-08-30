@@ -1,0 +1,80 @@
+name: Build GGW Academy for GitHub Pages
+
+# This workflow is intentionally manual. A personal-account GitHub Pages URL
+# is public by default, so publishing must wait until GGW has configured either
+# GitHub Enterprise Cloud private Pages or an approved access-controlled host.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ggw-academy-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build static GitHub Pages output
+        env:
+          # Optional endpoint URLs only. Keep all credentials server-side.
+          NEXT_PUBLIC_ACADEMY_API_BASE: ${{ vars.NEXT_PUBLIC_ACADEMY_API_BASE }}
+          NEXT_PUBLIC_GEMINI_API_URL: ${{ vars.NEXT_PUBLIC_GEMINI_API_URL }}
+        run: npm run build:github
+
+      - name: Keep GitHub Pages from applying Jekyll processing
+        run: touch dist/client/.nojekyll
+
+      - name: Verify static route and asset contract
+        run: |
+          test -f dist/client/index.html
+          test -f dist/client/progress/index.html
+          test -f dist/client/prompts/index.html
+          test -f dist/client/404.html
+          ! grep -R -n -E 'href="/(assets|favicon)|src="/(assets|favicon)|cloudflare:workers|GEMINI_API_KEY' dist/client --include='*.html' --include='*.rsc' --include='*.js' --include='*.css'
+
+      - name: Configure Pages metadata
+        uses: actions/configure-pages@v5
+
+      - name: Upload static Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/client
+
+  deploy:
+    # Deliberately disabled until an access gateway/private Pages control is
+    # configured. Set the repository variable to the literal string "true"
+    # only after reviewing docs/GITHUB_PAGES_PRIVATE_SETUP.md.
+    if: ${{ vars.GGW_ENABLE_PAGES_DEPLOYMENT == 'true' }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy approved Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

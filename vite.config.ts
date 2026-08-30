@@ -1,5 +1,6 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
+import path from "node:path";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
 
@@ -7,6 +8,8 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
 const { d1, r2 } = hostingConfig;
+const isGithubPagesBuild = process.env.GITHUB_PAGES === "true";
+const githubPagesBasePath = (process.env.NEXT_PUBLIC_BASE_PATH || "/GGW-Academy").replace(/\/$/, "");
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -34,6 +37,26 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async () => {
+  if (isGithubPagesBuild) {
+    return {
+      server: {
+        host: "0.0.0.0",
+        allowedHosts: ["terminal.local"],
+      },
+      base: `${githubPagesBasePath}/`,
+      // GitHub Pages is a static export. The hosted Sites and Cloudflare
+      // plugins are intentionally omitted because they provide runtime-only
+      // bindings that cannot be evaluated during static pre-rendering.
+      plugins: [vinext()],
+      resolve: {
+        // The server API routes remain in the repository for the hosted
+        // deployment. They are skipped by the static exporter, but the
+        // server bundle still analyzes their Cloudflare-only import.
+        alias: { "cloudflare:workers": path.resolve("build/github-pages-env.ts") },
+      },
+    };
+  }
+
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= "false";

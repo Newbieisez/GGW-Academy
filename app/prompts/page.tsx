@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { PromptLibraryView, SiteHeader } from "../page";
+import { academyPath, PromptLibraryView, SiteHeader } from "../page";
+
+export const dynamic = "force-static";
 
 export default function PromptsPage() {
   const [notice, setNotice] = useState("");
@@ -17,10 +19,10 @@ export default function PromptsPage() {
     <div className="academy-app">
       <SiteHeader
         view="prompts"
-        onHome={() => { window.location.href = "/"; }}
+        onHome={() => { window.location.href = academyPath("/"); }}
         onPrompts={() => { window.scrollTo({ top: 0, behavior: "smooth" }); }}
-        onSandbox={() => { window.location.href = "/"; }}
-        onDashboard={() => { window.location.href = "/progress"; }}
+        onSandbox={() => { window.location.href = academyPath("/?view=sandbox"); }}
+        onDashboard={() => { window.location.href = academyPath("/progress"); }}
       />
       {notice && <div className="copy-notice" role="status"><CheckCircle2 size={15} />{notice}</div>}
       <PromptLibraryView onCopy={copyText} />
