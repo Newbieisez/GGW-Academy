@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788044268853,
+      "tag": "0000_lazy_killer_shrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788102570221,
+      "tag": "0001_outstanding_joystick",
+      "breakpoints": true
+    }
+  ]
+}
