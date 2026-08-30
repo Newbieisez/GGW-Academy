@@ -63,9 +63,9 @@ jobs:
 
   deploy:
     # Deliberately disabled until an access gateway/private Pages control is
-    # configured. Set the repository variable to the literal string "true"
-    # only after reviewing docs/GITHUB_PAGES_PRIVATE_SETUP.md.
-    if: ${{ vars.GGW_ENABLE_PAGES_DEPLOYMENT == 'true' }}
+    # configured and tested. Both repository variables must be the literal
+    # string "true"; review docs/GITHUB_PAGES_PRIVATE_SETUP.md first.
+    if: ${{ vars.GGW_ENABLE_PAGES_DEPLOYMENT == 'true' && vars.GGW_PRIVATE_ACCESS_CONFIRMED == 'true' }}
     needs: build
     runs-on: ubuntu-latest
     environment:

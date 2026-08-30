@@ -11,7 +11,7 @@ Use one of these real access-control options before enabling deployment:
 1. **GitHub Enterprise Cloud private Pages**: move the repository into a GitHub Enterprise Cloud organization and configure the organization’s private Pages controls for the approved GGW users or group.
 2. **Approved access-controlled host**: publish the static build to a host that supports Google Workspace authentication and an email/group allowlist. If a custom domain is placed in front of GitHub Pages, protect the custom domain with the gateway and do not distribute the default `github.io` URL; confirm with the gateway owner that the origin URL cannot bypass the policy.
 
-The workflow in `.github/workflows/pages.yml` is manual and its deploy job is disabled unless the repository variable `GGW_ENABLE_PAGES_DEPLOYMENT` is exactly `true`. This is an intentional stop point, not a missing feature.
+The workflow in `.github/workflows/pages.yml` is manual and its deploy job is disabled unless both repository variables are exactly `true`: `GGW_ENABLE_PAGES_DEPLOYMENT` and `GGW_PRIVATE_ACCESS_CONFIRMED`. This is an intentional stop point, not a missing feature.
 
 ## GGW access checklist
 
@@ -55,4 +55,4 @@ These values are URLs, not secrets. The backend must authenticate the request, e
 3. Verify the default GitHub Pages URL cannot bypass the protected route, or use GitHub Enterprise Cloud private Pages.
 4. Configure the secure API and test identity, progress writes, and Gemini responses with fictional data.
 5. Run the manual workflow with deployment still disabled and inspect the artifact.
-6. Set `GGW_ENABLE_PAGES_DEPLOYMENT=true` only after the checks above pass.
+6. Set both `GGW_ENABLE_PAGES_DEPLOYMENT=true` and `GGW_PRIVATE_ACCESS_CONFIRMED=true` only after the checks above pass.

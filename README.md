@@ -90,7 +90,7 @@ npm run build:github
 
 The build uses `/GGW-Academy/` as its base path, writes static output to `dist/client`, and keeps the beginner learning paths, prompt library, progress page, and browser-safe practice coach functional without server routes. With no secure external API configured, progress is saved only in the current browser; it is not a verified Google account record and is not shared across devices.
 
-The Pages workflow is intentionally manual and the deploy job is disabled until the repository variable `GGW_ENABLE_PAGES_DEPLOYMENT` is set to `true`. GitHub Pages on a personal account is public by default, even when the source repository is private. GGW must configure GitHub Enterprise Cloud private Pages or an approved access-controlled host before enabling deployment. Read [`docs/GITHUB_PAGES_PRIVATE_SETUP.md`](docs/GITHUB_PAGES_PRIVATE_SETUP.md) for the activation checklist.
+The Pages workflow is intentionally manual and the deploy job is disabled until both repository variables `GGW_ENABLE_PAGES_DEPLOYMENT` and `GGW_PRIVATE_ACCESS_CONFIRMED` are set to `true`. GitHub Pages on a personal account is public by default, even when the source repository is private. GGW must configure GitHub Enterprise Cloud private Pages or an approved access-controlled host before enabling deployment. Read [`docs/GITHUB_PAGES_PRIVATE_SETUP.md`](docs/GITHUB_PAGES_PRIVATE_SETUP.md) for the activation checklist.
 
 Do not put API keys in `NEXT_PUBLIC_*` variables. If a secure external backend is later configured, set `NEXT_PUBLIC_ACADEMY_API_BASE` and `NEXT_PUBLIC_GEMINI_API_URL` to protected endpoint URLs and keep `GEMINI_API_KEY`, OAuth secrets, service-account keys, and database credentials server-side.
 
