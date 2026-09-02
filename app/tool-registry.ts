@@ -26,10 +26,10 @@ export type ToolLink = {
 
 export const toolRegistry: Record<ToolId, ToolLink> = {
   WildApricot: {
-    label: "GGW WildApricot",
-    url: "https://www.globalgamingwomen.org/",
+    label: "WildApricot",
+    url: "https://www.wildapricot.com/",
     learnUrl: "https://gethelp.wildapricot.com/",
-    actionLabel: "Open GGW WildApricot",
+    actionLabel: "WildApricot",
   },
   Gmail: {
     label: "Gmail",
