@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./nav-overrides.css";
+import "./portal-header.css";
 import "./ggw-workbench.css";
+import "./ggw-workbench-v2.css";
 import "./prompt-workbench.css";
 import "./prompt-workbench-v2.css";
 import "./nonprofit-operations-hub.css";
@@ -10,6 +12,7 @@ import "./canva-helper.css";
 import "./connector-guides.css";
 import "./portal-account.css";
 import "./legal-footer.css";
+import PortalHeader from "./portal-header";
 import GGWWorkbench from "./ggw-workbench";
 import NonprofitOperationsHub from "./nonprofit-operations-hub";
 import GoogleWorkspaceHub from "./google-workspace-hub";
@@ -30,6 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body>
+        <PortalHeader />
         <GGWWorkbench />
         <NonprofitOperationsHub />
         <GoogleWorkspaceHub />
