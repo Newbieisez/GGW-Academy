@@ -111,14 +111,19 @@ test("production Cloudflare config protects identity boundaries and targets the 
     read("docs/PRODUCTION_LAUNCH.md"),
   ]);
 
-  assert.match(wrangler, /"name":\s*"ggw-ai-workbench"/);
+  assert.match(wrangler, /"name":\s*"ggw-academy"/);
   assert.match(wrangler, /"pattern":\s*"ggw\.its-ez\.com"/);
   assert.match(wrangler, /"custom_domain":\s*true/);
+  assert.match(wrangler, /"binding":\s*"DB"/);
+  assert.match(wrangler, /"database_name":\s*"ggw-workbench-prod"/);
   assert.match(wrangler, /"binding":\s*"ASSETS"/);
+  assert.match(wrangler, /"run_worker_first":\s*false/);
   assert.match(wrangler, /"binding":\s*"IMAGES"/);
   assert.match(worker, /TRUSTED_IDENTITY_HEADERS/);
   assert.match(worker, /headers\.delete\(header\)/);
   assert.match(worker, /ctx\.access\.getIdentity\(\)/);
+  assert.match(worker, /cf-access-jwt-assertion/);
+  assert.match(worker, /cf-access-authenticated-user-email/);
   assert.match(worker, /oai-authenticated-user-email/);
   assert.match(worker, /X-Content-Type-Options/);
   assert.doesNotMatch(vite, /SITE_CREATOR_PLACEHOLDER_DATABASE_ID/);
