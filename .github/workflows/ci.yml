@@ -28,5 +28,8 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Validate Cloudflare deployment
+        run: npx wrangler deploy --dry-run
+
       - name: Portal and component contract tests
         run: node --test tests/ui-components.test.mjs tests/workbench-contracts.test.mjs

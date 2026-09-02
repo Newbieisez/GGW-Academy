@@ -1,10 +1,10 @@
-/** Cloudflare Worker entry point for the vinext-starter template. */
+/** Cloudflare Worker entry point for the GGW AI Workbench. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
 interface Env {
   ASSETS: Fetcher;
-  DB: D1Database;
+  DB?: D1Database;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -14,33 +14,89 @@ interface Env {
   };
 }
 
+type AccessIdentity = {
+  email?: string;
+  name?: string;
+};
+
+type AccessContext = {
+  aud?: string;
+  getIdentity(): Promise<AccessIdentity | null>;
+};
+
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
   passThroughOnException(): void;
+  access?: AccessContext;
 }
 
-// Image security config. SVG sources with .svg extension auto-skip the
-// optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
-// const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
+const TRUSTED_IDENTITY_HEADERS = [
+  "cf-access-authenticated-user-email",
+  "cf-access-authenticated-user-name",
+  "oai-authenticated-user-email",
+  "oai-authenticated-user-name",
+  "oai-authenticated-user-full-name",
+];
+
+async function withVerifiedIdentity(request: Request, ctx: ExecutionContext): Promise<Request> {
+  const headers = new Headers(request.headers);
+
+  // Never trust identity headers supplied by the browser or an upstream client.
+  // Cloudflare Access is the authentication authority for production.
+  for (const header of TRUSTED_IDENTITY_HEADERS) headers.delete(header);
+
+  if (ctx.access) {
+    const identity = await ctx.access.getIdentity();
+    const email = identity?.email?.trim().toLowerCase();
+    const name = identity?.name?.trim();
+
+    if (email) {
+      headers.set("cf-access-authenticated-user-email", email);
+      headers.set("oai-authenticated-user-email", email);
+    }
+    if (name) {
+      headers.set("cf-access-authenticated-user-name", name);
+      headers.set("oai-authenticated-user-name", name);
+      headers.set("oai-authenticated-user-full-name", name);
+    }
+  }
+
+  return new Request(request, { headers });
+}
+
+function addSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  headers.set("X-Frame-Options", "SAMEORIGIN");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
+    const verifiedRequest = await withVerifiedIdentity(request, ctx);
+    const url = new URL(verifiedRequest.url);
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
+      const response = await handleImageOptimization(verifiedRequest, {
+        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, verifiedRequest.url))),
         transformImage: async (body, { width, format, quality }) => {
           const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
           return result.response();
         },
       }, allowedWidths);
+      return addSecurityHeaders(response);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(verifiedRequest, env, ctx);
+    return addSecurityHeaders(response);
   },
 };
 
