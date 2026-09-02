@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export const dynamic = "force-static";
 
 export default function ProgressPage() {
@@ -6,7 +8,7 @@ export default function ProgressPage() {
       <span>GGW AI WORKBENCH</span>
       <h1>Start with the work you need to do.</h1>
       <p>The old learning-progress view has been retired from the GGW portal. Use the Workbench for task help, the Prompt Library for task-ready prompts, and the Run &amp; Grow GGW section for nonprofit operations.</p>
-      <a href="/">Return to the Workbench</a>
+      <Link href="/">Return to the Workbench</Link>
     </main>
   );
 }
