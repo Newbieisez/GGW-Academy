@@ -1,19 +1,8 @@
-"use client";
-
-import { academyPath, SiteHeader } from "../page";
-
 export const dynamic = "force-static";
 
 export default function LegalPage() {
   return (
-    <div className="academy-app ggw-legal-page-shell">
-      <SiteHeader
-        view="progress"
-        onHome={() => { window.location.href = academyPath("/"); }}
-        onPrompts={() => { window.location.href = academyPath("/prompts"); }}
-        onSandbox={() => { window.location.href = academyPath("/"); }}
-        onDashboard={() => { window.location.href = academyPath("/"); }}
-      />
+    <div className="ggw-legal-page-shell">
       <main className="ggw-legal-page">
         <header>
           <span>GGW AI WORKBENCH</span>
