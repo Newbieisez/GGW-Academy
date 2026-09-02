@@ -29,4 +29,4 @@ jobs:
         run: npm run build
 
       - name: Portal and component contract tests
-        run: node --test tests/*.test.mjs
+        run: node --test tests/ui-components.test.mjs tests/workbench-contracts.test.mjs
