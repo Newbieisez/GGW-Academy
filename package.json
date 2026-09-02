@@ -12,6 +12,8 @@
     "build:github": "GITHUB_PAGES=true NEXT_PUBLIC_GGW_STATIC=true NEXT_PUBLIC_BASE_PATH=/GGW-Academy bash scripts/build-verified.sh",
     "preview": "npm run build && vite preview",
     "deploy": "npm run build && wrangler deploy",
+    "deploy:prod": "npm run build && npm run db:migrate:prod && wrangler deploy",
+    "db:migrate:prod": "wrangler d1 migrations apply ggw-workbench-prod --remote",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
