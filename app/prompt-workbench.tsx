@@ -2,10 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Copy, ExternalLink, Search, ShieldCheck, Sparkles } from "lucide-react";
-import { promptOutcomes, prompts, promptTools, type PromptItem } from "./prompt-data";
+import { prompts, type PromptItem } from "./prompt-data";
+import { nonprofitPrompts } from "./nonprofit-prompt-data";
 import { toolRegistry, type ToolId } from "./tool-registry";
 
-const popularSearches = ["event promotion", "member renewal", "clean a Sheet", "board report", "email follow-up", "automation", "cash flow"];
+const libraryPrompts = [...prompts, ...nonprofitPrompts];
+const libraryOutcomes = Array.from(new Set(libraryPrompts.map((item) => item.outcome)));
+const libraryTools = Array.from(new Set(libraryPrompts.flatMap((item) => item.tools)));
+const popularSearches = ["event promotion", "member renewal", "board report", "grant", "compliance", "cash flow", "fundraising", "automation"];
 
 function PromptCard({ item }: { item: PromptItem }) {
   const [open, setOpen] = useState(false);
@@ -54,7 +58,7 @@ export default function PromptWorkbench() {
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return prompts.filter((item) => {
+    return libraryPrompts.filter((item) => {
       const matchesTool = tool === "All" || item.tools.includes(tool);
       const matchesOutcome = outcome === "All" || item.outcome === outcome;
       if (!matchesTool || !matchesOutcome) return false;
@@ -70,13 +74,13 @@ export default function PromptWorkbench() {
     <section className="ggw-pw-hero">
       <span><Sparkles size={16} /> GGW POWER PROMPT LIBRARY</span>
       <h1>Search the job. Copy the prompt. Do the work.</h1>
-      <p>This is the deep library—not a handful of examples. Search by the task in front of you, filter by the tool you are using, then open the full prompt. Every prompt is written for real GGW work and includes boundaries that keep the source facts controlled.</p>
+      <p>Search by the job in front of you—membership, events, grants, fundraising, finance, board operations, compliance, reporting, Google Workspace, or automation. Every prompt is built for practical GGW work and includes boundaries that keep authoritative source facts controlled.</p>
     </section>
 
     <section className="ggw-pw-controls" aria-label="Prompt filters">
       <label className="ggw-pw-search">
         <Search size={19} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search: renewal, event follow-up, formula, board report, cash flow, Canva…" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search: renewal, grant, board, compliance, cash flow, fundraising, event follow-up…" />
         {query && <button onClick={() => setQuery("")} aria-label="Clear search">×</button>}
       </label>
 
@@ -86,15 +90,15 @@ export default function PromptWorkbench() {
       </div>
 
       <div className="ggw-pw-selects">
-        <label><strong>Solution</strong><select value={tool} onChange={(event) => setTool(event.target.value as "All" | ToolId)}><option value="All">All solutions</option>{promptTools.map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
-        <label><strong>Work outcome</strong><select value={outcome} onChange={(event) => setOutcome(event.target.value)}><option value="All">All outcomes</option>{promptOutcomes.map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
+        <label><strong>Solution</strong><select value={tool} onChange={(event) => setTool(event.target.value as "All" | ToolId)}><option value="All">All solutions</option>{libraryTools.map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
+        <label><strong>Work outcome</strong><select value={outcome} onChange={(event) => setOutcome(event.target.value)}><option value="All">All outcomes</option>{libraryOutcomes.map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
       </div>
 
-      <div className="ggw-pw-result-count"><strong>{results.length}</strong><span>matching prompts</span><span className="ggw-pw-total">{prompts.length} total in the library</span><button onClick={clear}>Reset filters</button></div>
+      <div className="ggw-pw-result-count"><strong>{results.length}</strong><span>matching prompts</span><span className="ggw-pw-total">{libraryPrompts.length} total in the library</span><button onClick={clear}>Reset filters</button></div>
     </section>
 
     {results.length ? <section className="ggw-pw-grid">{results.map((item) => <PromptCard key={item.id} item={item} />)}</section> : <section className="ggw-pw-empty"><Search size={24} /><strong>No matching prompt yet.</strong><span>Try a broader job word or reset the filters.</span><button onClick={clear}>Show all prompts</button></section>}
 
-    <section className="ggw-pw-foot"><ShieldCheck size={20} /><div><strong>The prompt is the accelerator, not the authority.</strong><span>WildApricot and approved Google files remain the source. Check names, dates, links, amounts, eligibility, recipients, claims, and commitments before using an AI-assisted result.</span></div></section>
+    <section className="ggw-pw-foot"><ShieldCheck size={20} /><div><strong>The prompt is the accelerator, not the authority.</strong><span>WildApricot, approved Google files, signed agreements, official regulator/funder sources, GGW policy, and qualified professional guidance remain authoritative. Verify names, dates, links, amounts, restrictions, eligibility, recipients, claims, approvals, and compliance-sensitive decisions before use.</span></div></section>
   </main>;
 }
