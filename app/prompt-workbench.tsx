@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, Copy, ExternalLink, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, Search, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
 import { prompts, type PromptItem } from "./prompt-data";
 import { nonprofitPrompts } from "./nonprofit-prompt-data";
 import { toolRegistry, type ToolId } from "./tool-registry";
@@ -11,19 +11,39 @@ const libraryOutcomes = Array.from(new Set(libraryPrompts.map((item) => item.out
 const libraryTools = Array.from(new Set(libraryPrompts.flatMap((item) => item.tools)));
 const popularSearches = ["event promotion", "member renewal", "board report", "grant", "compliance", "cash flow", "fundraising", "automation"];
 
+function promptVariables(prompt: string) {
+  return Array.from(new Set(Array.from(prompt.matchAll(/\[([^\]]+)\]/g)).map((match) => match[1].trim())));
+}
+
+function prefersLongField(label: string) {
+  return /(paste|facts|source|notes|data|policy|rules|requirements|materials|inputs|metrics|workflow|process|description|content|agreement)/i.test(label);
+}
+
 function PromptCard({ item }: { item: PromptItem }) {
   const [open, setOpen] = useState(false);
+  const [customize, setCustomize] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const variables = useMemo(() => promptVariables(item.prompt), [item.prompt]);
+  const completedPrompt = useMemo(() => item.prompt.replace(/\[([^\]]+)\]/g, (full, rawLabel: string) => {
+    const label = rawLabel.trim();
+    const value = values[label]?.trim();
+    return value || full;
+  }), [item.prompt, values]);
 
   const copyPrompt = async () => {
     try {
-      await navigator.clipboard.writeText(item.prompt);
+      await navigator.clipboard.writeText(completedPrompt);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
     }
   };
+
+  const updateValue = (label: string, value: string) => setValues((current) => ({ ...current, [label]: value }));
+  const clearValues = () => setValues({});
+  const completedCount = variables.filter((label) => values[label]?.trim()).length;
 
   return <article className={open ? "ggw-pw-card open" : "ggw-pw-card"}>
     <div className="ggw-pw-card-top">
@@ -44,9 +64,29 @@ function PromptCard({ item }: { item: PromptItem }) {
       })}
     </div>
     <button className="ggw-pw-expand" onClick={() => setOpen(!open)} aria-expanded={open}>
-      {open ? "Hide full prompt" : "Show full prompt"}<ChevronDown size={15} />
+      {open ? "Hide prompt" : "Open prompt"}<ChevronDown size={15} />
     </button>
-    {open && <div className="ggw-pw-prompt">{item.prompt}</div>}
+    {open && <div className="ggw-pw-open-area">
+      {variables.length > 0 && <div className="ggw-pw-builder-bar">
+        <div><SlidersHorizontal size={15} /><span><strong>Fill it here</strong><small>{completedCount}/{variables.length} fields completed</small></span></div>
+        <button onClick={() => setCustomize(!customize)}>{customize ? "Hide fields" : "Customize prompt"}</button>
+      </div>}
+
+      {customize && variables.length > 0 && <div className="ggw-pw-variable-builder">
+        <div className="ggw-pw-variable-head"><div><strong>Replace the brackets before copying</strong><span>Only add information needed for this task. Leave a field blank if it still needs an owner or source check.</span></div><button onClick={clearValues}>Clear fields</button></div>
+        <div className="ggw-pw-variable-grid">
+          {variables.map((label) => <label key={label}>
+            <span>{label}</span>
+            {prefersLongField(label)
+              ? <textarea value={values[label] || ""} onChange={(event) => updateValue(label, event.target.value)} placeholder={`Enter ${label.toLowerCase()}…`} rows={3} />
+              : <input value={values[label] || ""} onChange={(event) => updateValue(label, event.target.value)} placeholder={`Enter ${label.toLowerCase()}…`} />}
+          </label>)}
+        </div>
+      </div>}
+
+      <div className="ggw-pw-preview-head"><strong>{completedCount ? "Your completed prompt" : "Full prompt"}</strong><button onClick={copyPrompt}>{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? "Copied" : "Copy prompt"}</button></div>
+      <div className="ggw-pw-prompt">{completedPrompt}</div>
+    </div>}
     <div className="ggw-pw-tags">{item.tags.map((tag) => <span key={tag}>#{tag}</span>)}</div>
   </article>;
 }
@@ -73,8 +113,8 @@ export default function PromptWorkbench() {
   return <main className="ggw-prompt-workbench">
     <section className="ggw-pw-hero">
       <span><Sparkles size={16} /> GGW POWER PROMPT LIBRARY</span>
-      <h1>Search the job. Copy the prompt. Do the work.</h1>
-      <p>Search by the job in front of you—membership, events, grants, fundraising, finance, board operations, compliance, reporting, Google Workspace, or automation. Every prompt is built for practical GGW work and includes boundaries that keep authoritative source facts controlled.</p>
+      <h1>Search the job. Fill the fields. Do the work.</h1>
+      <p>Search by the job in front of you—membership, events, grants, fundraising, finance, board operations, compliance, reporting, Google Workspace, or automation. Open a prompt, fill its variables directly in the portal, then copy a task-ready version.</p>
     </section>
 
     <section className="ggw-pw-controls" aria-label="Prompt filters">
