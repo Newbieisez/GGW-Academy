@@ -12,10 +12,11 @@ import "./canva-helper.css";
 import "./connector-guides.css";
 import "./portal-account.css";
 import "./legal-footer.css";
+import "./accessibility-polish.css";
 import PortalHeader from "./portal-header";
 import GGWWorkbench from "./ggw-workbench";
 import NonprofitOperationsHub from "./nonprofit-operations-hub";
-import GoogleWorkspaceHub from "./google-workspace-hub";
+import HomeGoogleWorkspaceHub from "./home-google-workspace-hub";
 import CanvaHelper from "./canva-helper";
 import ConnectorGuides from "./connector-guides";
 import PortalAccount from "./portal-account";
@@ -36,7 +37,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <PortalHeader />
         <GGWWorkbench />
         <NonprofitOperationsHub />
-        <GoogleWorkspaceHub />
+        <HomeGoogleWorkspaceHub />
         <CanvaHelper />
         <ConnectorGuides />
         <PortalAccount />
