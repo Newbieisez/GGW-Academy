@@ -41,24 +41,39 @@ const TRUSTED_IDENTITY_HEADERS = [
 async function withVerifiedIdentity(request: Request, ctx: ExecutionContext): Promise<Request> {
   const headers = new Headers(request.headers);
 
-  // Never trust identity headers supplied by the browser or an upstream client.
   // Cloudflare Access is the authentication authority for production.
+  // Prefer the Worker-native Access context when available. For a hostname
+  // protected as a self-hosted Access app, Cloudflare forwards the signed-in
+  // identity in Cf-Access-* headers; preserve that identity only when the
+  // Access JWT assertion is also present.
+  const forwardedAccessEmail = headers.get("cf-access-authenticated-user-email")?.trim().toLowerCase() || "";
+  const forwardedAccessName = headers.get("cf-access-authenticated-user-name")?.trim() || "";
+  const hasAccessAssertion = Boolean(headers.get("cf-access-jwt-assertion"));
+
   for (const header of TRUSTED_IDENTITY_HEADERS) headers.delete(header);
+
+  let email = "";
+  let name = "";
 
   if (ctx.access) {
     const identity = await ctx.access.getIdentity();
-    const email = identity?.email?.trim().toLowerCase();
-    const name = identity?.name?.trim();
+    email = identity?.email?.trim().toLowerCase() || "";
+    name = identity?.name?.trim() || "";
+  }
 
-    if (email) {
-      headers.set("cf-access-authenticated-user-email", email);
-      headers.set("oai-authenticated-user-email", email);
-    }
-    if (name) {
-      headers.set("cf-access-authenticated-user-name", name);
-      headers.set("oai-authenticated-user-name", name);
-      headers.set("oai-authenticated-user-full-name", name);
-    }
+  if (!email && hasAccessAssertion && forwardedAccessEmail) {
+    email = forwardedAccessEmail;
+    name = forwardedAccessName;
+  }
+
+  if (email) {
+    headers.set("cf-access-authenticated-user-email", email);
+    headers.set("oai-authenticated-user-email", email);
+  }
+  if (name) {
+    headers.set("cf-access-authenticated-user-name", name);
+    headers.set("oai-authenticated-user-name", name);
+    headers.set("oai-authenticated-user-full-name", name);
   }
 
   return new Request(request, { headers });
