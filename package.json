@@ -1,5 +1,5 @@
 {
-  "name": "ggw-ai-finance-academy",
+  "name": "ggw-ai-workbench",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -46,7 +46,7 @@
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
+    "@types/react-dom": "19.2.6",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
@@ -61,5 +61,5 @@
     "wrangler": "4.92.0"
   },
   "type": "module",
-  "displayName": "GGW AI Finance Academy"
+  "displayName": "GGW AI Workbench"
 }
