@@ -1,5 +1,5 @@
 {
-  "name": "ggw-ai-finance-academy",
+  "name": "ggw-ai-workbench",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -61,5 +61,5 @@
     "wrangler": "4.92.0"
   },
   "type": "module",
-  "displayName": "GGW AI Finance Academy"
+  "displayName": "GGW AI Workbench"
 }

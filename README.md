@@ -1,135 +1,112 @@
-# GGW AI Academy
+# GGW AI Workbench
 
-GGW AI Academy is a beginner-friendly learning site for Global Gaming Women employees. It teaches practical AI workflows inside familiar Google Workspace tools and keeps the learner focused on a real work outcome:
+GGW AI Workbench is a practical operations portal for Global Gaming Women staff. It is designed around the job in front of the user—not a course path.
 
-- Gmail, Docs, Meet, and Chat drafting and summarization
-- Sheets cleanup, Form 990 functional classification, and NotebookLM research
-- Slides, Google Vids, image generation, and video storytelling
-- Apps Script and low-code workflow automation
-- Gemini Spark, proactive agents, and human-in-the-loop safeguards
-- Governance, privacy, least privilege, and review-before-send habits
+The product model is:
 
-The experience follows a simple loop: choose a task, learn the workflow, practice safely, create an artifact, and record the result.
+**Find the job → open the right tool → follow the steps → fill/copy the prompt → verify the result → act.**
 
-## What is included
+## What the portal supports
+
+- WildApricot member, event, registration, and operational workflows
+- Google Workspace: Gmail, Sheets, Docs, Drive, Calendar, Meet, Slides, Forms
+- Gemini and NotebookLM source-grounded work
+- Canva content production workflows
+- Zapier, Make, Apps Script, and manual automation patterns
+- Nonprofit operations, board/governance, grants, fundraising, sponsorships, finance working aids, programs, volunteers, and process design
+- Compliance calendars, source checks, records/access review, grant restrictions, state-registration tracking, Form 990 preparation organization, financial controls, policy review, and escalation to qualified professionals
+- A deep searchable prompt library with inline variables, tool filters, work-outcome filters, copy actions, and verification guidance
+
+## Product routes
 
 | Path | Purpose |
 | --- | --- |
-| `/` | GGW-branded home page and six learning paths |
-| `/progress` | Learner dashboard with completion, diagnostic attempts, saved work, commitments, and outcomes |
-| `/prompts` | Searchable copy-and-use prompt library |
-| `/api/academy` | Identity-aware D1 progress and activity API |
-| `/api/gemini` | Server-side Gemini coach endpoint with a safe unconfigured fallback |
-| `db/schema.ts` | Drizzle/D1 schema for users, progress, attempts, outcomes, artifacts, and activity metadata |
-| `drizzle/` | Generated D1 migrations and schema snapshots |
-| `tests/` | Build/render and component contract tests |
+| `/` | Task-first GGW AI Workbench home experience |
+| `/prompts` | Deep searchable GGW Power Prompt Library |
+| `/legal` | Terms & Disclaimer |
+| `/progress` | Legacy/internal progress route retained while the application is migrated; not part of the primary Workbench UX |
+| `/api/academy` | Existing D1 identity/activity API retained for migration compatibility |
+| `/api/gemini` | Server-side AI helper endpoint; must remain protected before production exposure |
 
-## Requirements
+## Core UX rules
+
+1. Do not make staff learn a course before they can do their work.
+2. Every workflow should identify the authoritative source.
+3. Tool names should be actionable links where useful.
+4. WildApricot remains authoritative for membership/event records when it is the source system.
+5. Approved Google files, signed agreements, official regulator/funder sources, GGW policy, and qualified professional guidance remain authoritative for the relevant work.
+6. AI can draft, summarize, organize, classify, explain, and review; it should not silently make compliance, financial, legal, tax, HR, governance, or record-changing decisions.
+7. External communications and sensitive operational actions require a human review gate.
+8. When a connector is unavailable, provide a clear manual fallback.
+
+## Key UI modules
+
+- `app/ggw-workbench.tsx` — task-first home/job aids and automation patterns
+- `app/prompt-workbench.tsx` — searchable prompt library and inline prompt-variable builder
+- `app/prompt-data.ts` — core GGW prompt library
+- `app/nonprofit-prompt-data.ts` — nonprofit operations, growth, finance, governance, and compliance prompts
+- `app/google-workspace-hub.tsx` — actionable Google Workspace feature/use-case hub
+- `app/canva-helper.tsx` — Canva production job aids
+- `app/connector-guides.tsx` — exact setup/test/fallback guidance for Canva, Zapier, Make, and WildApricot→Google handoffs
+- `app/tool-registry.ts` — canonical direct links to WildApricot, Google tools, Canva, Zapier, and Make
+- `app/legal-footer.tsx` + `app/legal/page.tsx` — small global legal footer and full Terms & Disclaimer
+- `app/portal-account.tsx` — presentation/session status for the future protected production portal
+
+## Run locally
+
+Requirements:
 
 - Node.js `>=22.13.0`
 - npm
-- Linux with `flock`, `curl`, and GNU `timeout` for the provided Sites scripts
-- A Cloudflare D1 database when deploying the durable progress backend
-
-## Run locally
 
 ```bash
 npm ci
 npm run dev
 ```
 
-The local development binding is declared in `vite.config.ts`. Production Sites values are configured in the hosting control plane; do not put production secrets in this repository.
-
-Useful commands:
+Quality commands:
 
 ```bash
 npm run lint
 npm run build
 npm test
-npm run db:generate
 ```
 
-`npm test` performs a build and runs the repository tests. The rendered-HTML test is designed for the starter runtime and may need Cloudflare/Vinext runtime support when run outside the hosted Sites environment.
+## Hosting direction
 
-## Runtime environment variables
+The intended production URL is the GGW subdomain under `its-ez.com` rather than GitHub Pages. GitHub remains source/version control.
 
-Copy `.env.example` as a reference only. For production, set these values in the host’s secret/environment-variable manager:
+Production target:
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `GGW_ADMIN_EMAILS` | Optional | Comma-separated allowlist for the aggregate-only leadership view |
-| `GEMINI_API_KEY` | Optional | Server-side key for the progress-page Gemini coach |
-| `GEMINI_MODEL` | Optional | Gemini model name; defaults to `gemini-2.5-flash` |
+- Cloudflare-hosted application
+- Cloudflare Access at the portal edge
+- Google Workspace and/or Microsoft identity for approved GGW users
+- D1 for durable backend data where needed
+- server-side AI credentials only
+- no public production deployment before authentication and origin protection are configured
 
-The current Gemini coach deliberately does not send Drive, Gmail, Docs, Sheets, or saved artifact contents to the model. It sends the learner’s question plus a small page/module context. The question text is not written to the learner record; only a non-content activity event is recorded.
+GitHub Pages deployment remains disabled unless the repository variables explicitly enabling it are set. It should not be used as the public production host for GGW.
 
-Never commit an API key, OAuth secret, service-account key, or production `.env` file.
+## Authentication and identity
 
-## Authentication and learner identity
+Current code retains the existing hosted-site identity path for compatibility. Production migration should move identity behind a verified access layer. Do not replace verified identity with an email input or trust an arbitrary user-supplied header.
 
-The academy does not trust an email typed into a form. The current hosted implementation reads the authenticated identity header supplied by the Sites platform:
+The production application should validate the authenticated identity supplied by the protected hosting layer before any user-specific or sensitive server route is used.
 
-```text
-oai-authenticated-user-email
-```
+## AI safety and data handling
 
-That identity is the key used for D1 progress records. The current hosted Site is private and owner-only. It is not yet a standalone Google Sign-In / Google Workspace SSO application. A GitHub deployment that needs GGW employees to sign in with Google must add one of these identity layers:
+- Use the minimum information required for the task.
+- Avoid sending confidential member, donor, payment, HR, legal, credential, or other sensitive information to AI unless GGW has explicitly approved the use.
+- Prefer redaction, aggregation, and placeholders.
+- Validate names, dates, links, amounts, eligibility, statuses, recipients, metrics, restrictions, and commitments before action.
+- Compliance-sensitive prompts organize source material and questions; they do not decide what the law requires.
 
-1. Deploy under a Google Workspace access policy that restricts the site to GGW accounts or an approved group.
-2. Add Google Identity Services / OpenID Connect using a Google Cloud OAuth web client, server-side token verification, an exact authorized redirect URI, and an explicit GGW domain or allowlist check.
+Never commit API keys, OAuth secrets, service-account keys, production `.env` files, or other credentials.
 
-Do not replace this with an email input. An email input identifies a string; it does not verify the person.
+## Tool availability
 
-## GitHub Pages build and private access
+Third-party features depend on plan, permissions, administrator settings, and current connector support. The Workbench should label those dependencies rather than promise a feature that may not exist in GGW's account.
 
-The repository also includes a static build for GitHub Pages. Run it locally with:
+## Copyright
 
-```bash
-npm run build:github
-```
-
-The build uses `/GGW-Academy/` as its base path, writes static output to `dist/client`, and keeps the beginner learning paths, prompt library, progress page, and browser-safe practice coach functional without server routes. With no secure external API configured, progress is saved only in the current browser; it is not a verified Google account record and is not shared across devices.
-
-The Pages workflow is intentionally manual and the deploy job is disabled until both repository variables `GGW_ENABLE_PAGES_DEPLOYMENT` and `GGW_PRIVATE_ACCESS_CONFIRMED` are set to `true`. GitHub Pages on a personal account is public by default, even when the source repository is private. GGW must configure GitHub Enterprise Cloud private Pages or an approved access-controlled host before enabling deployment. Read [`docs/GITHUB_PAGES_PRIVATE_SETUP.md`](docs/GITHUB_PAGES_PRIVATE_SETUP.md) for the activation checklist.
-
-Do not put API keys in `NEXT_PUBLIC_*` variables. If a secure external backend is later configured, set `NEXT_PUBLIC_ACADEMY_API_BASE` and `NEXT_PUBLIC_GEMINI_API_URL` to protected endpoint URLs and keep `GEMINI_API_KEY`, OAuth secrets, service-account keys, and database credentials server-side.
-
-## D1 data model
-
-The site stores durable operational learning data keyed to the authenticated user:
-
-- `academy_users`: account identity, display name, onboarding state, and last-seen time
-- `academy_progress`: resumable navigation state and completed paths
-- `academy_module_progress`: status, step, best diagnostic score, attempts, lab/artifact flags, and commitment state
-- `academy_attempts`: scored diagnostic/practice attempts without raw source documents
-- `academy_outcomes`: 24-hour commitments and before/after result check-ins
-- `academy_work_products`: saved artifact summaries/content created by the learner
-- `academy_activity_events`: compact event metadata for adoption and audit trails
-
-Apply the migrations in `drizzle/` to the target D1 database before using the API. The deployed Sites version includes the migration files.
-
-## Sites deployment
-
-This repository includes `.openai/hosting.json` for the hosted Sites environment. That file declares the D1 binding name (`DB`) and the Sites project metadata used by the control plane.
-
-For a Sites deployment, use the Sites lifecycle for the repository:
-
-1. Install the locked dependencies with `npm run install:ci`.
-2. Run `npm run lint` and `npm run build`.
-3. Save a version from the exact source commit.
-4. Deploy the saved version only after verifying the saved commit and project match.
-5. Configure `GGW_ADMIN_EMAILS` and `GEMINI_API_KEY` in the Sites environment manager, then deploy a saved version so the environment revision is active.
-
-If you move the project to another host, keep the application source and migrations but replace the hosting-specific configuration and deployment commands with that host’s equivalents.
-
-## Safety boundaries
-
-- Sandbox exercises use fictional data and do not send email, modify Drive, share files, or run scripts.
-- Finance classification is a review aid, not a tax or accounting conclusion.
-- AI-generated drafts require human checks for names, dates, amounts, recipients, links, attachments, and promises.
-- Leadership reporting is aggregate-only and does not expose raw prompts, source documents, email bodies, or individual learner names.
-- The Gemini coach abstains from claiming access to GGW systems it cannot see.
-
-## License and brand
-
-This project is prepared for Global Gaming Women’s internal enablement work. Confirm GGW permission and brand guidance before publishing it publicly or reusing GGW imagery outside the approved site.
+Unless otherwise identified, original Workbench structure, original prompt content, workflow design, and original portal materials are © Erez Haimowicz. All Rights Reserved. Third-party product names, logos, screenshots, and trademarks remain the property of their respective owners.

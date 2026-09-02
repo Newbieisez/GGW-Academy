@@ -148,7 +148,7 @@ export default function ConnectorGuides() {
   }, []);
 
   if (!show) return null;
-  return <section className="ggw-connectors-helper">
+  return <section className="ggw-connectors-helper" id="ggw-connectors-helper">
     <div className="ggw-connectors-helper-head">
       <div><span>CONNECT THE TOOLS</span><h2>Need a connector? Here is exactly how to set it up.</h2><p>If a workflow needs Canva, Zapier, Make, or a WildApricot-to-Google handoff, open the guide. If you do not have permission to connect it, use the manual fallback and ask the GGW tool owner/admin for access.</p></div>
     </div>
