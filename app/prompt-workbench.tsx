@@ -98,7 +98,9 @@ export default function PromptWorkbench() {
 
   useEffect(() => {
     const deepLinkQuery = new URLSearchParams(window.location.search).get("q")?.trim();
-    if (deepLinkQuery) setQuery(deepLinkQuery);
+    if (!deepLinkQuery) return;
+    const frame = window.requestAnimationFrame(() => setQuery(deepLinkQuery));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const results = useMemo(() => {
