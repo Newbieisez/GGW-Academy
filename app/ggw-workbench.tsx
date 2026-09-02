@@ -9,6 +9,7 @@ import {
   Check,
   ChevronDown,
   Copy,
+  FileText,
   Mail,
   Presentation,
   Search,
@@ -19,13 +20,17 @@ import {
   Zap,
 } from "lucide-react";
 
+type Category = "all" | "members" | "events" | "communications" | "reporting" | "content" | "automation";
+
 type Aid = {
   id: string;
+  category: Exclude<Category, "all">;
   title: string;
   summary: string;
   useWhen: string;
   time: string;
-  icon: "mail" | "event" | "members" | "data" | "automation" | "visual";
+  tools: string;
+  icon: "mail" | "event" | "members" | "data" | "automation" | "visual" | "doc";
   steps: string[];
   prompt: string;
   check: string[];
@@ -34,6 +39,7 @@ type Aid = {
 type AutomationAid = {
   id: string;
   title: string;
+  trigger: string;
   outcome: string;
   connector: "Zapier" | "Make" | "Webhook / API";
   whatItIs: string;
@@ -52,167 +58,383 @@ type PromptAddition = {
   tags: string[];
 };
 
+const categories: Array<{ id: Category; label: string }> = [
+  { id: "all", label: "All help" },
+  { id: "members", label: "Members" },
+  { id: "events", label: "Events" },
+  { id: "communications", label: "Communications" },
+  { id: "reporting", label: "Reporting" },
+  { id: "content", label: "Content" },
+  { id: "automation", label: "Automations" },
+];
+
 const aids: Aid[] = [
   {
-    id: "member-email",
-    title: "Write or improve a member email",
-    summary: "Turn rough notes, an event update, or a WildApricot audience into a polished message without starting from a blank page.",
-    useWhen: "You know what needs to be communicated but want help making it clear, concise, and on-brand.",
-    time: "5 min",
-    icon: "mail",
+    id: "member-welcome",
+    category: "members",
+    title: "Welcome a new member",
+    summary: "Turn approved WildApricot member details into a warm first-touch message without writing from scratch.",
+    useWhen: "A new member joins and you want a personalized welcome draft quickly.",
+    time: "3–5 min",
+    tools: "WildApricot + Gemini + Gmail",
+    icon: "members",
     steps: [
-      "Start with the audience, purpose, approved facts, and desired action.",
-      "Use the prompt below in Gemini or the approved AI tool available in Google Workspace.",
-      "Review names, dates, links, promises, audience, and attachments before sending from Gmail or WildApricot.",
+      "Open the member record in WildApricot and confirm membership type, join date, and approved benefits.",
+      "Give Gemini only the fields needed for the message using the prompt below.",
+      "Review the draft, test links and merge fields, then send from the approved GGW channel.",
     ],
-    prompt: "Draft a concise GGW member email using only the facts below. Audience: [AUDIENCE]. Purpose: [PURPOSE]. Desired action: [ACTION]. Approved facts: [FACTS]. Tone: confident, welcoming, human, and inclusive. Give me: subject line, preview text, email body, CTA, and a CHECK BEFORE SENDING list. Do not invent dates, benefits, links, or commitments.",
-    check: ["Audience is correct", "Dates and links match the source", "No invented promises", "CTA is obvious"],
-  },
-  {
-    id: "event-kit",
-    title: "Turn one event into a promotion kit",
-    summary: "Create email, social copy, talking points, and a visual brief from one approved WildApricot event record.",
-    useWhen: "An event is already created and the team needs channel-ready promotion without rewriting the same details repeatedly.",
-    time: "10 min",
-    icon: "event",
-    steps: [
-      "Copy only the approved event facts: title, audience, date/time, location, description, registration link, and deadline.",
-      "Ask AI to create channel-specific drafts from those facts only.",
-      "Check every channel against the WildApricot event record before publishing.",
-    ],
-    prompt: "Create a GGW event promotion kit using only these approved event facts: [PASTE FACTS]. Return: 1) member email, 2) LinkedIn post, 3) short social caption, 4) 5 talking points, 5) a visual brief for Canva or image generation, and 6) a final fact-check list. Preserve the event name, date, time, location, registration URL, deadline, and eligibility exactly. Mark anything missing as [CHECK].",
-    check: ["Registration URL works", "Date/time/location match WildApricot", "Eligibility is accurate", "Visual claims are supported"],
-  },
-  {
-    id: "member-insights",
-    title: "Understand member or registration data",
-    summary: "Turn a WildApricot export into useful segments, patterns, follow-up lists, and questions to investigate.",
-    useWhen: "You need insight from members, registrations, renewals, or event activity without manually scanning rows.",
-    time: "10 min",
-    icon: "data",
-    steps: [
-      "Export only the fields needed for the question and work from a copy in Google Sheets.",
-      "Use Gemini in Sheets or an approved AI tool to summarize patterns and propose segments.",
-      "Validate sample rows before using the result for outreach, reporting, or record updates.",
-    ],
-    prompt: "Analyze this WildApricot export for GGW. Goal: [GOAL]. Use only the columns provided. Return: key patterns, useful segments, outliers or missing data, a prioritized follow-up list, and 5 questions the team should investigate. Do not infer sensitive attributes or invent member intent. For every recommendation, name the field or pattern that supports it.",
-    check: ["Only necessary fields were exported", "Segments are supported by data", "No sensitive inference", "Sample rows were verified"],
+    prompt: "Draft a personalized GGW welcome email using only these approved WildApricot fields: first name [NAME], membership type [TYPE], join date [DATE], approved benefits [BENEFITS], and next step [NEXT STEP]. Keep it under 180 words, warm, confident, inclusive, and human. Return subject line, email body, CTA, and CHECK BEFORE SENDING. Do not invent benefits, discounts, events, contacts, or eligibility.",
+    check: ["Membership type is correct", "Benefits are approved", "Links work", "Merge fields are tested"],
   },
   {
     id: "renewal-engagement",
-    title: "Prepare better renewal or engagement outreach",
-    summary: "Use membership status and engagement signals to create more relevant drafts while keeping a person in control of outreach.",
-    useWhen: "You have a defined member segment and want a faster first draft for renewal, re-engagement, or welcome communication.",
-    time: "10 min",
+    category: "members",
+    title: "Prepare renewal or re-engagement outreach",
+    summary: "Create relevant drafts for a defined member segment while WildApricot stays the source of membership status.",
+    useWhen: "You have a renewal, lapsed, or re-engagement segment and need better first-draft outreach.",
+    time: "5–10 min",
+    tools: "WildApricot + Google Sheets + Gemini",
     icon: "members",
     steps: [
-      "Define the segment and the exact reason they are receiving the message.",
-      "Give AI only the approved benefits, deadlines, and next step.",
-      "Review tone, eligibility, membership status, and merge fields before sending through WildApricot.",
+      "Define the segment in WildApricot or from an approved export in Google Sheets.",
+      "Give AI only the approved benefits, deadline, and next action for that segment.",
+      "Review membership status, eligibility, tone, merge fields, and links before sending.",
     ],
-    prompt: "Create a GGW [renewal / re-engagement / welcome] message for this segment: [SEGMENT]. Reason for outreach: [REASON]. Approved benefits or facts: [FACTS]. Deadline or next step: [NEXT STEP]. Write a concise subject line, preview text, email, CTA, and optional short follow-up. Do not invent benefits, discounts, deadlines, or membership status. Add a CHECK BEFORE SENDING list.",
-    check: ["Segment definition is intentional", "Benefits are approved", "Membership status is accurate", "Merge fields are tested"],
+    prompt: "Draft GGW [renewal / re-engagement] outreach for this segment: [SEGMENT]. Reason for outreach: [REASON]. Approved benefits/facts: [FACTS]. Deadline or next step: [NEXT STEP]. Return subject line, preview text, concise email, CTA, optional reminder, and CHECK BEFORE SENDING. Do not invent benefits, discounts, deadlines, eligibility, or member status.",
+    check: ["Segment rule is intentional", "Member status is current", "No invented benefits", "CTA is clear"],
   },
   {
-    id: "automation-helper",
-    title: "Automate repetitive WildApricot work",
-    summary: "Connect WildApricot to Google tools and AI so routine lists, drafts, summaries, and updates do not require repeated copying.",
-    useWhen: "A staff member repeats the same trigger → copy → update → draft sequence every week or after every event.",
-    time: "15 min setup",
-    icon: "automation",
-    steps: [
-      "Write the workflow in one sentence: When X happens in WildApricot, prepare Y in Z tool.",
-      "Choose Zapier for a simple trigger/action flow or Make for a multi-step workflow.",
-      "Test one fictional or low-risk record, confirm duplicates and permissions, then enable it for real work.",
-    ],
-    prompt: "Design the simplest automation for this GGW workflow: [DESCRIBE WORKFLOW]. WildApricot is the system of record. Return: trigger, required fields, connector recommendation (Zapier, Make, or API), actions in order, where AI adds value, human approval point, duplicate protection, failure handling, and a 5-step test plan. Prefer no-code and the fewest moving parts.",
-    check: ["System of record stays clear", "Least data needed", "Duplicate behavior tested", "Human approval exists before external impact"],
-  },
-  {
-    id: "deck-video",
-    title: "Create a deck, visual, or short video faster",
-    summary: "Turn approved facts into a clear story before asking AI to generate slides, images, or video scenes.",
-    useWhen: "You need a presentation or media asset and want AI to accelerate the first draft without creating random decoration.",
+    id: "member-insights",
+    category: "members",
+    title: "Understand a member list quickly",
+    summary: "Turn a WildApricot export into useful, supported segments and follow-up ideas in Google Sheets.",
+    useWhen: "You need insight from a member list faster than manually scanning rows.",
     time: "10 min",
+    tools: "WildApricot + Google Sheets + Gemini",
+    icon: "data",
+    steps: [
+      "Export only the fields needed for the business question and work from a copy in Sheets.",
+      "Ask Gemini to propose segments using only fields that actually exist in the export.",
+      "Validate sample rows from every proposed segment before using the result.",
+    ],
+    prompt: "Review this WildApricot member export for GGW. Goal: [GOAL]. Suggest useful segments using only fields present in the export. For each segment show: rule, count if available, why it matters, and recommended next action. Flag missing or inconsistent data. Do not infer sensitive attributes, personal intent, or eligibility that is not explicitly present.",
+    check: ["Only needed fields were exported", "Rules are visible", "No sensitive inference", "Sample rows were checked"],
+  },
+  {
+    id: "event-kit",
+    category: "events",
+    title: "Turn one event into a promotion kit",
+    summary: "Use one approved WildApricot event record to draft email, social copy, talking points, and a visual brief.",
+    useWhen: "The event record is ready and the team needs channel-ready promotion without retyping the same facts.",
+    time: "8–10 min",
+    tools: "WildApricot + Gemini + Canva / Slides",
+    icon: "event",
+    steps: [
+      "Copy the approved event facts from WildApricot: title, audience, date/time, location, description, registration URL, deadline, pricing, and eligibility.",
+      "Use the prompt below to create channel-specific drafts from those facts only.",
+      "Compare every draft back to the WildApricot event record before publishing.",
+    ],
+    prompt: "Create a GGW event promotion kit using only these approved WildApricot event facts: [PASTE FACTS]. Return: 1) member email, 2) LinkedIn post, 3) short social caption, 4) five talking points, 5) Canva/image visual brief, and 6) fact-check list. Preserve event name, date, time, location, registration URL, deadline, pricing, and eligibility exactly. Mark anything missing as [CHECK].",
+    check: ["Registration URL works", "Date/time/location match", "Eligibility/pricing match", "Visual claims are supported"],
+  },
+  {
+    id: "event-followup",
+    category: "events",
+    title: "Create post-event follow-up",
+    summary: "Prepare attendee, no-show, speaker/partner, and internal follow-up without rewriting every message.",
+    useWhen: "An event is complete and the team needs different follow-ups for different audiences.",
+    time: "5–10 min",
+    tools: "WildApricot + Gemini + Gmail",
+    icon: "event",
+    steps: [
+      "Use the approved event details and registration status from WildApricot.",
+      "Ask AI for audience-specific drafts and an internal action summary.",
+      "Verify attendee status, links, names, commitments, and next steps before sending.",
+    ],
+    prompt: "Using these approved WildApricot event details and registration fields, prepare GGW post-event follow-up. Create: attendee thank-you, no-show follow-up, speaker/partner thank-you, and internal action summary. Use only provided facts. Preserve links, names, dates, and commitments exactly. Add CHECK BEFORE SENDING to each audience version.",
+    check: ["Correct audience list", "Attendance status is accurate", "Links are approved", "No invented takeaways or commitments"],
+  },
+  {
+    id: "registration-insights",
+    category: "events",
+    title: "Understand event registrations quickly",
+    summary: "Turn registration data into attendance patterns, follow-up groups, and data-quality issues in Sheets.",
+    useWhen: "You need a quick operational view of who registered and what needs attention.",
+    time: "5–10 min",
+    tools: "WildApricot + Google Sheets + Gemini",
+    icon: "data",
+    steps: [
+      "Export or sync the minimum registration fields into a controlled Google Sheet.",
+      "Ask Gemini for patterns, useful groups, missing fields, and follow-up needs.",
+      "Check a sample of rows before using any segment or count in communication or reporting.",
+    ],
+    prompt: "Analyze this GGW WildApricot event registration export. Goal: [GOAL]. Return: registration count, useful non-sensitive segments, cancellations/no-shows if present, missing or inconsistent fields, follow-up groups, and 5 operational questions to investigate. Use only fields provided. Separate facts from recommendations and name the field or pattern behind each recommendation.",
+    check: ["Counts tie to source", "Cancellations are handled correctly", "No sensitive inference", "Sample rows match"],
+  },
+  {
+    id: "email-helper",
+    category: "communications",
+    title: "Write or improve a GGW email",
+    summary: "Turn rough notes, a long thread, or approved facts into a clear human message.",
+    useWhen: "You know what needs to be said but want help making it concise and appropriate for the audience.",
+    time: "3–5 min",
+    tools: "Gmail + Gemini",
+    icon: "mail",
+    steps: [
+      "Start with the audience, purpose, approved facts, and desired action.",
+      "Ask Gemini for a draft or rewrite using a fixed output shape.",
+      "Check names, dates, links, promises, recipients, and attachments before sending.",
+    ],
+    prompt: "Draft a concise GGW email. Audience: [AUDIENCE]. Purpose: [PURPOSE]. Desired action: [ACTION]. Approved facts: [FACTS]. Tone: confident, welcoming, inclusive, and human. Return subject line, preview text, email body, CTA, and CHECK BEFORE SENDING. Do not invent dates, benefits, links, decisions, or commitments.",
+    check: ["Audience is correct", "Facts match source", "Tone sounds human", "Recipients/attachments are correct"],
+  },
+  {
+    id: "partner-update",
+    category: "communications",
+    title: "Draft a sponsor or partner update",
+    summary: "Turn confirmed notes into a polished external update without creating new promises.",
+    useWhen: "A sponsor, speaker, partner, or stakeholder needs a concise status update or next-step email.",
+    time: "5 min",
+    tools: "Google Docs / Gmail + Gemini",
+    icon: "mail",
+    steps: [
+      "List only confirmed status, decisions, open questions, owner, and next date.",
+      "Use AI to organize the message rather than create new commitments.",
+      "Verify every deliverable, date, owner, and promise before sending externally.",
+    ],
+    prompt: "Draft a concise GGW sponsor/partner update from these confirmed notes: [NOTES]. Return: current status, completed items, next steps with owners/dates, open questions, and a short closing. Keep the tone professional, appreciative, and direct. Do not invent deliverables, dates, approvals, benefits, or commitments. Mark gaps as [CHECK].",
+    check: ["Deliverables are confirmed", "Dates/owners match source", "No new promises", "External audience is correct"],
+  },
+  {
+    id: "meeting-to-actions",
+    category: "communications",
+    title: "Turn meeting notes into actions",
+    summary: "Convert a Meet recap or rough notes into decisions, owners, dates, and a clean follow-up.",
+    useWhen: "A meeting ends with useful discussion but the next steps are scattered or unclear.",
+    time: "5 min",
+    tools: "Google Meet + Docs + Gemini",
+    icon: "doc",
+    steps: [
+      "Use the approved Meet recap or your notes as the source.",
+      "Ask Gemini to separate decisions, open questions, and action items with owners/dates.",
+      "Compare the result to the source before sharing the follow-up.",
+    ],
+    prompt: "Turn these GGW meeting notes into a useful follow-up. Return: 1) decisions, 2) open questions, 3) action items with owner and due date, 4) risks/blockers, and 5) a short follow-up email. If an owner or date is not stated, write Not stated. Do not invent commitments. Finish with CHECK BEFORE SHARING.",
+    check: ["Decisions are supported", "Owners/dates were stated", "No invented commitments", "Follow-up audience is correct"],
+  },
+  {
+    id: "operations-brief",
+    category: "reporting",
+    title: "Create a weekly operations brief",
+    summary: "Turn member, event, and activity data into a short internal snapshot focused on changes and next actions.",
+    useWhen: "The team needs an operational summary without repeatedly checking multiple screens and trackers.",
+    time: "10 min",
+    tools: "WildApricot + Google Sheets + Gemini",
+    icon: "data",
+    steps: [
+      "Collect only the agreed metrics and date range into one controlled Sheet or export.",
+      "Ask AI to summarize changes, exceptions, and follow-up items rather than simply repeating the numbers.",
+      "Validate key totals and exceptions against the source before sharing internally.",
+    ],
+    prompt: "Create a concise GGW weekly operations brief from this approved data. Return: 1) what changed, 2) member signals, 3) event signals, 4) exceptions or data-quality issues, 5) actions with owner if provided, and 6) questions requiring a human decision. Separate facts from recommendations. Do not expose unnecessary personal data in the summary.",
+    check: ["Date range is correct", "Totals tie to source", "PII is minimized", "Recommendations are labeled"],
+  },
+  {
+    id: "board-brief",
+    category: "reporting",
+    title: "Turn activity data into a board-ready summary",
+    summary: "Convert approved metrics and notes into a concise leadership narrative without overstating impact.",
+    useWhen: "Leadership needs a short summary of activity, outcomes, risks, and next actions.",
+    time: "10 min",
+    tools: "Google Sheets + Docs + Gemini",
+    icon: "data",
+    steps: [
+      "Start from approved metrics and source notes; do not ask AI to invent the story from raw numbers.",
+      "Ask for a short narrative with fact, trend, implication, and next step.",
+      "Verify every number, comparison, quote, and claim before placing it in a board deck or memo.",
+    ],
+    prompt: "Turn these approved GGW metrics and notes into a board-ready summary. Return: executive headline, 3–5 key facts, what changed versus the comparison period if provided, why it matters, risks/questions, and recommended next steps. Use only the supplied data. Do not infer causation, impact, or ROI unless the evidence is explicitly provided. Mark unsupported claims as [CHECK].",
+    check: ["Every number is sourced", "Comparisons use the same period", "No invented causation", "Claims are supportable"],
+  },
+  {
+    id: "sheet-cleanup",
+    category: "reporting",
+    title: "Clean up a messy Google Sheet",
+    summary: "Use Gemini to standardize structure, flag missing data, and prepare a safer working copy without touching the source first.",
+    useWhen: "A Sheet has inconsistent dates, duplicate rows, blank fields, or messy labels that make analysis slow.",
+    time: "5–10 min",
+    tools: "Google Sheets + Gemini",
+    icon: "data",
+    steps: [
+      "Make a working copy of the Sheet and keep the original unchanged.",
+      "Ask Gemini to preview the cleanup rules before changing anything.",
+      "Apply the cleanup in small passes and spot-check rows after each pass.",
+    ],
+    prompt: "Help me clean this Google Sheet without changing the source meaning. First inspect the headers and sample rows. Propose a cleanup plan for dates, whitespace, capitalization, duplicates, missing values, and inconsistent labels. Do not delete or overwrite anything yet. Return the proposed rules, rows that need human review, and the safest order to apply the cleanup.",
+    check: ["Original is unchanged", "Rules are visible", "Duplicates were reviewed", "Meaning was preserved"],
+  },
+  {
+    id: "creative-helper",
+    category: "content",
+    title: "Create a deck, visual, or short video faster",
+    summary: "Turn approved facts into a clear story before generating slides, imagery, or video scenes.",
+    useWhen: "You need a presentation or media asset and want AI to accelerate the first draft without random decoration.",
+    time: "10 min",
+    tools: "Docs + Slides + Canva + Google Vids",
     icon: "visual",
     steps: [
       "Write the audience, one message, approved facts, and desired action first.",
-      "Ask AI for the narrative, slide/scene structure, and visual purpose before generating assets.",
-      "Review claims, accessibility, representation, links, and brand fit before publishing.",
+      "Ask AI for the narrative/scene structure and visual purpose before generating assets.",
+      "Review claims, accessibility, representation, links, captions, and brand fit before publishing.",
     ],
-    prompt: "Build a concise GGW [presentation / visual / 60-second video] plan. Audience: [AUDIENCE]. One message they should remember: [MESSAGE]. Approved facts: [FACTS]. Desired action: [ACTION]. Return the minimum number of slides or scenes needed, purpose of each, suggested visual, speaker/voiceover notes, accessibility text, and [CHECK] markers for anything that needs confirmation. Keep the style modern, confident, inclusive, and human.",
-    check: ["One clear audience outcome", "Facts match source", "Accessibility included", "No unsupported visual claims"],
+    prompt: "Build a concise GGW [presentation / visual / 60-second video] plan. Audience: [AUDIENCE]. One message they should remember: [MESSAGE]. Approved facts: [FACTS]. Desired action: [ACTION]. Return the minimum number of slides/scenes needed, purpose of each, suggested visual, speaker/voiceover notes, accessibility text, and [CHECK] markers for anything requiring confirmation. Keep the style modern, confident, inclusive, and human.",
+    check: ["One clear audience outcome", "Facts match source", "Accessibility is included", "No unsupported visual claims"],
+  },
+  {
+    id: "automation-helper",
+    category: "automation",
+    title: "Design the simplest WildApricot automation",
+    summary: "Turn a repetitive trigger → copy → update → draft process into a safe no-code workflow.",
+    useWhen: "Someone repeats the same handoff every week, after every member change, or after every event.",
+    time: "10–15 min to map",
+    tools: "WildApricot + Zapier / Make + Google Workspace",
+    icon: "automation",
+    steps: [
+      "Write the workflow in one sentence: When X happens in WildApricot, prepare Y in a Google tool.",
+      "Use Zapier for a simple trigger/action flow, Make for multi-step/branching, and API/webhook only for a real connector gap.",
+      "Test with fictional or low-risk data, duplicate scenarios, permission errors, and a visible human review step.",
+    ],
+    prompt: "Design the simplest automation for this GGW workflow: [WORKFLOW]. WildApricot is the system of record and Google Workspace is the primary work environment. Recommend Zapier for a simple trigger/action flow, Make for multi-step/branching, or API/webhook only when needed. Return: trigger, minimum required fields, Google destination, actions in order, where AI adds value, human approval point, duplicate protection, failure handling, permissions, and a 5-step test plan. Prefer no-code and the fewest moving parts.",
+    check: ["System of record stays clear", "Minimum data only", "Duplicates are tested", "External impact has review"],
   },
 ];
 
 const automations: AutomationAid[] = [
   {
-    id: "registration-sheet",
-    title: "New event registration → Google Sheet → AI summary",
-    outcome: "Keep an always-current working registration sheet and use AI to summarize attendance patterns or prepare follow-up groups.",
+    id: "new-member-welcome",
+    title: "New member → welcome draft",
+    trigger: "WildApricot: Contact or Member Created / Updated",
+    outcome: "Prepare a personalized welcome draft without manually copying member details into an email.",
     connector: "Zapier",
-    whatItIs: "Zapier is a no-code connector that watches for a trigger in one app and performs an action in another.",
-    whyUseful: "Best for straightforward workflows where WildApricot should trigger one or two actions without someone exporting data manually.",
+    whatItIs: "Zapier is a no-code connector that watches for a trigger in one app and runs an action in another.",
+    whyUseful: "Use it when one WildApricot event should cause one or two predictable Google Workspace steps.",
     steps: [
-      "In Zapier, choose WildApricot as the trigger app and select the supported registration/contact event that matches the workflow.",
-      "Connect the approved WildApricot account and test the trigger with a test or low-risk record.",
-      "Add Google Sheets as the action and map only the fields the team actually needs.",
-      "Turn on duplicate protection using a unique member, contact, or registration identifier where available.",
-      "Use Gemini in the Sheet for summaries, segments, or follow-up preparation; keep record changes in WildApricot intentional.",
+      "Create a Zap and choose WildApricot as the trigger app.",
+      "Choose the contact/member created or updated trigger and test it with a low-risk record.",
+      "Map only the fields needed for the welcome into the next step.",
+      "Use Gemini to draft the welcome, then create a Gmail draft or review row in Google Sheets.",
+      "Test merge fields and duplicate behavior before enabling the Zap.",
     ],
-    aiStep: "Ask Gemini to summarize registrations, group attendees by useful non-sensitive fields, identify missing data, or prepare a reviewed follow-up list.",
-    verify: ["Correct event", "Correct field mapping", "No duplicate rows", "Sheet access is appropriate", "AI does not update WildApricot without review"],
+    aiStep: "Draft the welcome from approved membership facts; AI should not invent benefits, eligibility, or membership status.",
+    verify: ["Correct trigger", "Only needed fields", "Draft-first pilot", "Merge fields tested", "Owner for errors"],
   },
   {
-    id: "member-outreach",
-    title: "Membership change → prepared outreach",
-    outcome: "Prepare timely welcome, renewal, or follow-up drafts when a supported WildApricot member/contact event occurs.",
+    id: "event-registration",
+    title: "New registration → Google Sheet + follow-up prep",
+    trigger: "WildApricot: Event Registration Created / Updated / Canceled",
+    outcome: "Keep an operational registration Sheet current and prepare useful attendee groups without repeated exports.",
     connector: "Zapier",
-    whatItIs: "Zapier is the easiest starting point when the workflow is essentially: when this happens in WildApricot, do this next.",
-    whyUseful: "It reduces missed follow-up and repetitive drafting while keeping WildApricot as the source of membership status.",
+    whatItIs: "Zapier can listen for supported WildApricot registration events and pass selected fields into Google Sheets or another approved Google tool.",
+    whyUseful: "This removes repetitive export/copy work and keeps an operational tracker current between events.",
     steps: [
-      "Choose the WildApricot trigger that matches the membership/contact event available in the connector.",
-      "Add a controlled Google Sheet, Gmail draft, or other approved destination as the next step.",
-      "Pass only the fields needed to prepare the outreach.",
-      "Use AI to draft the message from approved facts and the reason for outreach.",
-      "Keep the workflow in draft/review mode until the team has verified segment logic and merge fields.",
+      "Choose the event-registration trigger that matches the workflow and select the intended event.",
+      "Add Google Sheets as the action and map only the operational fields the team needs.",
+      "Use a stable contact or registration identifier for dedupe/update logic.",
+      "Use Gemini in the Sheet to summarize patterns or prepare reviewed follow-up groups.",
+      "Test a new registration, update, cancellation, and duplicate before enabling.",
     ],
-    aiStep: "Generate a draft based on membership status, approved benefits, and the intended next action; do not let AI invent eligibility or benefits.",
-    verify: ["Membership status is current", "Segment logic is correct", "Merge fields work", "No unintended recipients", "First versions are not auto-sent"],
+    aiStep: "Summarize registration patterns, identify missing information, and prepare follow-up groups using non-sensitive fields.",
+    verify: ["Correct event", "Field mapping verified", "Dedupe works", "Cancellation tested", "Sheet access is appropriate"],
   },
   {
-    id: "event-campaign",
-    title: "WildApricot event → multi-step campaign workflow",
-    outcome: "Move approved event information through several preparation steps without recreating the same work in each tool.",
+    id: "membership-level",
+    title: "Membership-level change → correct outreach draft",
+    trigger: "WildApricot: Membership Level Updated",
+    outcome: "Prepare the appropriate message or internal action when a member's level changes.",
+    connector: "Zapier",
+    whatItIs: "Zapier is the simplest choice when a supported status change should trigger one controlled follow-up.",
+    whyUseful: "It reduces missed follow-up while keeping the actual membership level in WildApricot as the source of truth.",
+    steps: [
+      "Use Membership Level Updated as the WildApricot trigger.",
+      "Add a filter if only particular old/new levels should continue.",
+      "Pass only the fields required to Google Sheets, Gemini, or a Gmail draft step.",
+      "Generate the correct approved message variant or internal review task.",
+      "Test expected and unexpected level changes before enabling.",
+    ],
+    aiStep: "Draft the appropriate message from the actual membership level and approved benefits; never infer eligibility from unrelated fields.",
+    verify: ["Old/new level is correct", "Filter logic tested", "No unintended recipients", "Benefits approved", "Draft-first pilot"],
+  },
+  {
+    id: "event-content",
+    title: "Event created/changed → promotion preparation",
+    trigger: "WildApricot: Event Created or Modified",
+    outcome: "Turn one approved event record into several prepared content assets without repeatedly copying the same facts.",
     connector: "Make",
-    whatItIs: "Make is a visual no-code automation platform. It is useful when a workflow has several steps, branches, filters, or data transformations.",
-    whyUseful: "Use it when one WildApricot event needs to feed a Sheet, internal checklist, content preparation, and follow-up workflow in a controlled sequence.",
+    whatItIs: "Make is a visual no-code automation platform designed for workflows with several steps, filters, branches, or transformations.",
+    whyUseful: "Use Make when one WildApricot event needs to feed several Google/content preparation steps in a controlled sequence.",
     steps: [
-      "Create a scenario in Make and connect WildApricot using the supported module/API connection available to the team.",
-      "Start with the event or registration trigger and add a filter so only the intended event/workflow continues.",
-      "Route only approved event fields to each destination step.",
-      "Add AI only where transformation helps: summaries, channel copy, categorization, or draft preparation.",
-      "Test every route with test data and configure visible error handling before scheduling the scenario.",
+      "Create a Make scenario and connect the approved WildApricot account/application.",
+      "Use the event trigger and add a filter so only intended events continue.",
+      "Route approved event fields to a Google Sheet or content-preparation step.",
+      "Use AI to transform the same facts into channel-specific drafts; do not edit the WildApricot source record automatically.",
+      "Add visible error handling and test every route before scheduling the scenario.",
     ],
-    aiStep: "Transform one approved event source into channel-specific drafts, internal summaries, or follow-up preparation without changing the source record.",
-    verify: ["Filter catches only the intended event", "Private fields do not travel unnecessarily", "Failed routes are visible", "AI output is reviewed", "Schedule is appropriate"],
+    aiStep: "Transform one approved event source into email, social, visual brief, and internal checklist drafts.",
+    verify: ["Filter catches intended events only", "Private fields do not travel", "Errors are visible", "Output is reviewed", "No automatic source edits"],
   },
   {
-    id: "custom-webhook",
-    title: "WildApricot change → custom workflow",
-    outcome: "Start a custom process when a ready-made Zapier or Make connector does not expose the exact event or action needed.",
-    connector: "Webhook / API",
-    whatItIs: "A webhook is a notification sent when something changes. An API is a controlled way for another system to read or update WildApricot data.",
-    whyUseful: "This is the advanced option for gaps that no-code connectors cannot cover. It should have a technical owner because authentication, errors, rate limits, and permissions matter.",
+    id: "payment-reporting",
+    title: "Payment update → finance working Sheet + exception review",
+    trigger: "WildApricot: Payment Updated / Refund Created or Updated",
+    outcome: "Reduce manual transaction copying while keeping payment records authoritative in WildApricot and human-reviewed in reporting.",
+    connector: "Zapier",
+    whatItIs: "Zapier can pass a supported payment/refund event into a controlled Google Sheet for reconciliation or operational reporting.",
+    whyUseful: "It can eliminate repetitive data entry without letting AI alter payment records or make accounting decisions.",
     steps: [
-      "Confirm that Zapier or Make cannot cover the requirement first.",
-      "Define the exact WildApricot event/data needed and the minimum fields required.",
+      "Choose the payment/refund trigger required for the reporting workflow.",
+      "Map only the transaction identifiers, dates, status, amount, and other approved fields into a restricted Google Sheet.",
+      "Use a stable transaction identifier to update rather than duplicate rows.",
+      "Use Gemini only to summarize exceptions or data-quality issues, not to change financial records.",
+      "Reconcile sample transactions to WildApricot before relying on the Sheet.",
+    ],
+    aiStep: "Summarize exceptions, missing information, or changes for a finance owner to review; do not make tax/accounting conclusions.",
+    verify: ["Amounts/status match source", "Restricted Sheet access", "No duplicate transactions", "Refunds tested", "Finance owner reviews exceptions"],
+  },
+  {
+    id: "multi-step-ops",
+    title: "WildApricot activity → multi-step Google workflow",
+    trigger: "WildApricot contact, event, registration, invoice, or payment module",
+    outcome: "Handle several linked preparation steps when a simple one-trigger/one-action Zap is no longer enough.",
+    connector: "Make",
+    whatItIs: "Make is useful for visual workflows that need multiple steps, filters, branching logic, scheduled searches, or transformations.",
+    whyUseful: "It is a better fit when a single WildApricot change needs to update a Sheet, prepare a Doc, create a draft, and route an internal review.",
+    steps: [
+      "Write the full workflow first and identify the exact WildApricot source event or scheduled lookup.",
+      "Build one route at a time and filter out records that should not continue.",
+      "Keep Google Sheets or Drive as visible working destinations so staff can inspect the result.",
+      "Add AI only where it transforms text/data into a useful draft or summary.",
+      "Create an error route and document who pauses or fixes the scenario.",
+    ],
+    aiStep: "Use AI for summarization, categorization, draft creation, or exception explanation—not as the owner of member, event, or payment data.",
+    verify: ["Every route has a purpose", "Filters tested", "Errors visible", "Human review before external action", "Pause owner documented"],
+  },
+  {
+    id: "custom-integration",
+    title: "Connector gap → custom workflow",
+    trigger: "A required WildApricot event/action is not covered by the approved no-code flow",
+    outcome: "Use an API/webhook only when Zapier or Make cannot support the business requirement cleanly.",
+    connector: "Webhook / API",
+    whatItIs: "A webhook notifies another system when something changes. An API is a controlled way for another system to read or update WildApricot data.",
+    whyUseful: "This is the advanced option for genuine connector gaps. It needs a technical owner because authentication, errors, rate limits, logging, and permissions matter.",
+    steps: [
+      "Confirm Zapier or Make cannot cover the requirement first.",
+      "Define the exact event/data needed and the minimum fields required.",
       "Have the technical owner configure authentication, webhook/API handling, logging, retries, and failure alerts.",
-      "Use AI downstream for preparation or analysis, not as an unreviewed authority to change membership or financial records.",
+      "Use AI downstream for preparation or analysis, not as an unreviewed authority to change records.",
       "Test in a controlled environment and document how to disable or roll back the workflow.",
     ],
-    aiStep: "Use AI after the integration has safely delivered the required fields—for example to classify, summarize, or prepare a draft for review.",
-    verify: ["Technical owner assigned", "Authentication is secure", "Rate/error handling exists", "Least privilege used", "Rollback documented"],
+    aiStep: "Use AI after the integration safely delivers the required fields—for example to summarize, classify, or prepare a draft for review.",
+    verify: ["Technical owner assigned", "Authentication is secure", "Error handling exists", "Least privilege used", "Rollback documented"],
   },
 ];
 
@@ -242,28 +464,60 @@ const promptAdditions: PromptAddition[] = [
     tags: ["WildApricot", "Renewal", "Members", "Email"],
   },
   {
-    id: "wa-event-kit",
-    title: "Turn a WildApricot event into a campaign kit",
-    tool: "WildApricot + Gemini",
-    summary: "Reuse one approved event source across email, social, and creative work.",
-    prompt: "Create a GGW campaign kit using only these approved WildApricot event facts: [FACTS]. Return: member email, LinkedIn post, short social caption, 5 talking points, Canva/image brief, and a fact-check list. Preserve event name, date, time, location, registration URL, deadline, and eligibility exactly. Mark missing information as [CHECK].",
-    tags: ["WildApricot", "Events", "Marketing", "Canva"],
+    id: "wa-event-promo",
+    title: "Create an event promotion kit from one WildApricot record",
+    tool: "WildApricot + Gemini + Canva",
+    summary: "Reuse one approved event source across email, social, talking points, and visuals.",
+    prompt: "Create a GGW event promotion kit using only these approved WildApricot event facts: [PASTE FACTS]. Return: member email, LinkedIn post, short social caption, five talking points, Canva visual brief, and a final fact-check list. Preserve event name, date, time, location, registration URL, deadline, pricing, and eligibility exactly. Mark missing items as [CHECK].",
+    tags: ["WildApricot", "Events", "Content", "Canva"],
   },
   {
-    id: "wa-engagement-brief",
-    title: "Create a leadership engagement brief",
-    tool: "WildApricot + Sheets",
-    summary: "Turn member/event activity into a short evidence-based brief for decision makers.",
-    prompt: "Turn this approved GGW WildApricot export into a one-page leadership engagement brief. Return: what changed, strongest signals, participation or renewal patterns, data-quality gaps, 3 implications, and 3 recommended questions for leadership. Separate facts from interpretation. Cite the exact fields or counts supporting each point. Do not infer intent or sensitive attributes.",
-    tags: ["WildApricot", "Leadership", "Reporting", "Engagement"],
+    id: "wa-registration-analysis",
+    title: "Analyze event registrations in Google Sheets",
+    tool: "WildApricot + Sheets + Gemini",
+    summary: "Create a quick operational view of registrations without manually scanning rows.",
+    prompt: "Analyze this WildApricot event registration export in Google Sheets. Goal: [GOAL]. Return: registration count, useful non-sensitive segments, cancellation/no-show indicators if present, missing or inconsistent data, follow-up groups, and five questions to investigate. Use only the provided fields. Separate facts from recommendations.",
+    tags: ["WildApricot", "Events", "Sheets", "Analysis"],
+  },
+  {
+    id: "sheet-cleanup",
+    title: "Plan a safe cleanup for a messy Google Sheet",
+    tool: "Google Sheets + Gemini",
+    summary: "Preview cleanup rules before changing dates, labels, duplicates, or missing values.",
+    prompt: "Help me clean this Google Sheet without changing the source meaning. First inspect the headers and sample rows. Propose a cleanup plan for dates, whitespace, capitalization, duplicates, missing values, and inconsistent labels. Do not delete or overwrite anything yet. Return the proposed rules, rows that need human review, and the safest order to apply the cleanup.",
+    tags: ["Sheets", "Cleanup", "Data", "Gemini"],
+  },
+  {
+    id: "meeting-actions",
+    title: "Turn a GGW meeting recap into actions",
+    tool: "Google Meet + Docs + Gemini",
+    summary: "Convert meeting notes into decisions, owners, dates, and a follow-up draft.",
+    prompt: "Turn these GGW meeting notes into a useful follow-up. Return: decisions, open questions, action items with owner and due date, risks/blockers, and a short follow-up email. If an owner or date is not stated, write Not stated. Do not invent commitments. Finish with CHECK BEFORE SHARING.",
+    tags: ["Meet", "Docs", "Actions", "Follow-up"],
+  },
+  {
+    id: "partner-update",
+    title: "Draft a sponsor or partner update",
+    tool: "Docs / Gmail + Gemini",
+    summary: "Organize confirmed status and next steps without creating new commitments.",
+    prompt: "Draft a concise GGW sponsor/partner update from these confirmed notes: [NOTES]. Return: current status, completed items, next steps with owners/dates, open questions, and a short closing. Keep the tone professional, appreciative, and direct. Do not invent deliverables, dates, approvals, benefits, or commitments. Mark gaps as [CHECK].",
+    tags: ["Partners", "Gmail", "Docs", "Communication"],
+  },
+  {
+    id: "board-summary",
+    title: "Turn approved metrics into a board-ready summary",
+    tool: "Sheets + Docs + Gemini",
+    summary: "Create a concise leadership narrative while keeping claims tied to evidence.",
+    prompt: "Turn these approved GGW metrics and notes into a board-ready summary. Return: executive headline, 3–5 key facts, what changed versus the comparison period if provided, why it matters, risks/questions, and recommended next steps. Use only supplied data. Do not infer causation, impact, or ROI unless evidence is explicitly provided. Mark unsupported claims as [CHECK].",
+    tags: ["Board", "Reporting", "Sheets", "Docs"],
   },
   {
     id: "wa-automation-design",
-    title: "Design the simplest WildApricot automation",
+    title: "Design the simplest WildApricot + Google automation",
     tool: "WildApricot + Zapier / Make",
-    summary: "Choose the lightest connector and map a safe workflow before building it.",
-    prompt: "Design the simplest automation for this GGW workflow: [WORKFLOW]. WildApricot is the system of record. Recommend Zapier for simple trigger/action flows, Make for multi-step/branching workflows, or API/webhook only when needed. Return: trigger, minimum required fields, actions in order, AI step, human approval point, duplicate protection, failure handling, permissions, and a 5-step test plan. Prefer no-code and the fewest moving parts.",
-    tags: ["WildApricot", "Automation", "Zapier", "Make"],
+    summary: "Choose the lightest connector and map a safe Google-first workflow before building it.",
+    prompt: "Design the simplest automation for this GGW workflow: [WORKFLOW]. WildApricot is the system of record and Google Workspace is the primary work environment. Recommend Zapier for simple trigger/action flows, Make for multi-step/branching workflows, or API/webhook only when needed. Return: trigger, minimum required fields, Google destination, actions in order, AI step, human approval point, duplicate protection, failure handling, permissions, and a 5-step test plan. Prefer no-code and the fewest moving parts.",
+    tags: ["WildApricot", "Automation", "Zapier", "Make", "Google"],
   },
 ];
 
@@ -273,6 +527,7 @@ function iconFor(kind: Aid["icon"]) {
   if (kind === "members") return <Users size={22} />;
   if (kind === "data") return <BarChart3 size={22} />;
   if (kind === "automation") return <Workflow size={22} />;
+  if (kind === "doc") return <FileText size={22} />;
   return <Presentation size={22} />;
 }
 
@@ -291,7 +546,7 @@ function AidCard({ aid }: { aid: Aid }) {
   return <article className={open ? "ggw-aid-card open" : "ggw-aid-card"}>
     <button className="ggw-aid-summary" onClick={() => setOpen(!open)} aria-expanded={open}>
       <span className="ggw-aid-icon">{iconFor(aid.icon)}</span>
-      <span className="ggw-aid-copy"><strong>{aid.title}</strong><small>{aid.summary}</small></span>
+      <span className="ggw-aid-copy"><strong>{aid.title}</strong><small>{aid.summary}</small><em>{aid.tools}</em></span>
       <span className="ggw-aid-time">{aid.time}</span>
       <ChevronDown className="ggw-aid-chevron" size={19} />
     </button>
@@ -309,7 +564,7 @@ function AutomationCard({ item }: { item: AutomationAid }) {
   return <article className={open ? "ggw-auto-card open" : "ggw-auto-card"}>
     <button className="ggw-auto-summary" onClick={() => setOpen(!open)} aria-expanded={open}>
       <span className="ggw-auto-badge"><Zap size={15} />{item.connector}</span>
-      <span><strong>{item.title}</strong><small>{item.outcome}</small></span>
+      <span><strong>{item.title}</strong><small>{item.outcome}</small><em>{item.trigger}</em></span>
       <ChevronDown size={19} />
     </button>
     {open && <div className="ggw-auto-detail">
@@ -323,43 +578,60 @@ function AutomationCard({ item }: { item: AutomationAid }) {
 
 function WorkbenchHome() {
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<Category>("all");
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return aids;
-    return aids.filter((aid) => [aid.title, aid.summary, aid.useWhen, aid.prompt].join(" ").toLowerCase().includes(q));
-  }, [query]);
+    return aids.filter((aid) => {
+      const matchesCategory = category === "all" || aid.category === category;
+      const matchesQuery = !q || [aid.title, aid.summary, aid.useWhen, aid.tools, aid.prompt, aid.category].join(" ").toLowerCase().includes(q);
+      return matchesCategory && matchesQuery;
+    });
+  }, [query, category]);
 
   return <main className="ggw-workbench">
     <section className="ggw-workbench-hero">
       <div className="ggw-workbench-hero-copy">
         <span className="ggw-kicker"><Sparkles size={16} /> GGW AI Workbench</span>
-        <h1>What are you trying to get done?</h1>
-        <p>Pick the job. Get the steps. Copy the prompt. Use AI where it actually saves time.</p>
-        <div className="ggw-workbench-search"><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try: member email, event, renewal, WildApricot, automation…" aria-label="Search GGW AI job aids" />{query && <button onClick={() => setQuery("")} aria-label="Clear search">×</button>}</div>
-        <div className="ggw-hero-actions"><button onClick={() => { window.location.href = "?view=prompts"; }}>Find a prompt <ArrowRight size={15} /></button><span>No lesson plan. Just the help you need.</span></div>
+        <h1>What do you need help with?</h1>
+        <p>Search the job in front of you. Get the steps, the prompt, the Google workflow, and the check before you use the result.</p>
+        <div className="ggw-workbench-search"><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try: member renewal, event follow-up, clean a Sheet, sponsor email, automate…" aria-label="Search GGW AI job aids" />{query && <button onClick={() => setQuery("")} aria-label="Clear search">×</button>}</div>
+        <div className="ggw-hero-actions"><button onClick={() => { window.location.href = "?view=prompts"; }}>Open Prompt Library <ArrowRight size={15} /></button><span>Works in the browser on Mac or Windows.</span></div>
       </div>
       <div className="ggw-workbench-hero-card">
-        <strong>Use AI like a coworker, not a magic button.</strong>
-        <div><span>1</span><p><b>Give it the job</b>What outcome do you need?</p></div>
-        <div><span>2</span><p><b>Give it the source</b>What facts or data can it use?</p></div>
-        <div><span>3</span><p><b>Check the result</b>What must a person verify?</p></div>
+        <strong>The GGW way to use AI</strong>
+        <div><span>1</span><p><b>Start with the job</b>What are you trying to get done?</p></div>
+        <div><span>2</span><p><b>Use the source</b>WildApricot or the approved Google file stays authoritative.</p></div>
+        <div><span>3</span><p><b>Check before action</b>Review names, dates, links, amounts, recipients, and commitments.</p></div>
       </div>
+    </section>
+
+    <section className="ggw-tool-strip" aria-label="GGW work environment">
+      <div><strong>WildApricot</strong><span>Members, events, registrations, payments</span></div>
+      <div><strong>Google Sheets</strong><span>Working data, analysis, trackers</span></div>
+      <div><strong>Gmail + Docs</strong><span>Reviewed drafts and communication</span></div>
+      <div><strong>Drive + Gemini</strong><span>Approved sources, summaries, research</span></div>
     </section>
 
     <section className="ggw-aids-section">
       <div className="ggw-section-head"><div><span>Fast help for real GGW work</span><h2>Choose the job, not the course.</h2></div><small>{filtered.length} job aid{filtered.length === 1 ? "" : "s"}</small></div>
+      <div className="ggw-filter-row" aria-label="Filter job aids">{categories.map((item) => <button key={item.id} className={category === item.id ? "active" : ""} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>
       <div className="ggw-aid-list">{filtered.map((aid) => <AidCard key={aid.id} aid={aid} />)}</div>
-      {!filtered.length && <div className="ggw-empty"><Search size={20} /><strong>No exact match.</strong><span>Try a broader job like email, event, data, or automation.</span></div>}
+      {!filtered.length && <div className="ggw-empty"><Search size={20} /><strong>No exact match.</strong><span>Try a broader job like member, event, email, Sheet, report, content, or automation.</span></div>}
     </section>
 
-    <section className="ggw-automation-section">
-      <div className="ggw-section-head"><div><span>WildApricot + AI automations</span><h2>Stop repeating work that a connector can handle.</h2><p>Start with Zapier for simple workflows. Use Make when there are several steps or branches. Use webhooks/API only when the no-code connectors cannot do the job.</p></div></div>
+    <section className="ggw-automation-section" id="automations">
+      <div className="ggw-section-head"><div><span>WildApricot + Google automations</span><h2>Stop repeating the handoff.</h2><p>WildApricot remains the system of record. Connectors move only the information needed into Google Workspace, where AI can prepare a draft, summary, group, or review item.</p></div></div>
       <div className="ggw-connector-strip">
-        <div><b>Zapier</b><span>Easiest: trigger → action</span></div>
-        <div><b>Make</b><span>Multi-step and branching workflows</span></div>
-        <div><b>Webhook / API</b><span>Advanced custom integration</span></div>
+        <div><b>Zapier</b><span>Best for a simple trigger → Google action</span></div>
+        <div><b>Make</b><span>Best for several steps, filters, or branches</span></div>
+        <div><b>Webhook / API</b><span>Advanced; use only for a real connector gap</span></div>
       </div>
       <div className="ggw-auto-list">{automations.map((item) => <AutomationCard key={item.id} item={item} />)}</div>
+    </section>
+
+    <section className="ggw-os-note">
+      <strong>Mac or Windows?</strong>
+      <span>The Workbench teaches browser and Google Workspace steps first. When a keyboard shortcut matters, use ⌘ on Mac or Ctrl on Windows. The workflow itself should not change.</span>
     </section>
 
     <section className="ggw-bottom-cta">
@@ -380,7 +652,7 @@ function PromptCard({ item }: { item: PromptAddition }) {
 }
 
 function PromptExtension({ target }: { target: Element }) {
-  return createPortal(<section className="ggw-prompt-extension"><div className="ggw-section-head"><div><span>GGW + WildApricot</span><h2>Prompts for the work you actually do.</h2><p>These focus on member operations, events, engagement, and automation. Use the minimum data needed and review results before updating records or sending outreach.</p></div></div><div className="ggw-extra-prompt-grid">{promptAdditions.map((item) => <PromptCard key={item.id} item={item} />)}</div></section>, target);
+  return createPortal(<section className="ggw-prompt-extension"><div className="ggw-section-head"><div><span>GGW + WildApricot + Google</span><h2>Prompts for the work you actually do.</h2><p>Member operations, events, Google Sheets, communication, reporting, content, and automation. Replace the brackets, use the minimum data needed, then review the result before changing a record or sending anything.</p></div></div><div className="ggw-extra-prompt-grid">{promptAdditions.map((item) => <PromptCard key={item.id} item={item} />)}</div></section>, target);
 }
 
 function getCurrentView() {
