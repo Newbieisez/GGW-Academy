@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LockKeyhole, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 
 type Session = {
   authenticated?: boolean;
@@ -27,15 +27,9 @@ export default function PortalAccount() {
     return () => observer.disconnect();
   }, []);
 
-  if (!show) return null;
+  if (!show || !session?.authenticated || !session.user?.email) return null;
 
-  if (session?.authenticated && session.user?.email) {
-    return <div className="ggw-account-pill" role="status" title="Verified portal account">
-      <UserRound size={15}/><span><strong>Signed in</strong><small>{session.user.email}</small></span>
-    </div>;
-  }
-
-  return <div className="ggw-account-pill preview" title="Authentication will be enabled on the protected production domain">
-    <LockKeyhole size={15}/><span><strong>Protected portal</strong><small>Google or Microsoft sign-in at launch</small></span>
+  return <div className="ggw-account-pill" role="status" title="Verified portal account">
+    <UserRound size={15}/><span><strong>Signed in</strong><small>{session.user.email}</small></span>
   </div>;
 }
