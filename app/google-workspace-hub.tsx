@@ -144,7 +144,7 @@ export default function GoogleWorkspaceHub() {
         {googleTools.map((tool) => (
           <article className="ggw-google-card" key={tool.name}>
             <div className="ggw-google-card-title">
-              <img src={tool.icon} width={42} height={42} alt="" loading="lazy" />
+              <span className="ggw-google-product-icon" style={{ backgroundImage: `url("${tool.icon}")` }} aria-hidden="true" />
               <div><h3>{tool.name}</h3><span>{tool.domain}</span></div>
             </div>
             <p className="ggw-google-purpose">{tool.purpose}</p>
