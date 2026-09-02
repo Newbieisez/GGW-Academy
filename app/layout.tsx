@@ -4,12 +4,14 @@ import "./nav-overrides.css";
 import "./ggw-workbench.css";
 import "./prompt-workbench.css";
 import "./prompt-workbench-v2.css";
+import "./nonprofit-operations-hub.css";
 import "./google-workspace-hub.css";
 import "./canva-helper.css";
 import "./connector-guides.css";
 import "./portal-account.css";
 import "./legal-footer.css";
 import GGWWorkbench from "./ggw-workbench";
+import NonprofitOperationsHub from "./nonprofit-operations-hub";
 import GoogleWorkspaceHub from "./google-workspace-hub";
 import CanvaHelper from "./canva-helper";
 import ConnectorGuides from "./connector-guides";
@@ -29,6 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         <GGWWorkbench />
+        <NonprofitOperationsHub />
         <GoogleWorkspaceHub />
         <CanvaHelper />
         <ConnectorGuides />
