@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./nav-overrides.css";
 import "./ggw-workbench.css";
+import "./connector-guides.css";
 import GGWWorkbench from "./ggw-workbench";
+import ConnectorGuides from "./connector-guides";
 
 const publicBasePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
 
@@ -13,5 +15,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><GGWWorkbench />{children}</body></html>;
+  return <html lang="en"><body><GGWWorkbench /><ConnectorGuides />{children}</body></html>;
 }
