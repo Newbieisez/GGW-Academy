@@ -10,6 +10,14 @@
       "custom_domain": true
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ggw-workbench-prod",
+      "database_id": "29309a2c-701f-4f82-957e-61c64eb6be22",
+      "migrations_dir": "drizzle"
+    }
+  ],
   "assets": {
     "binding": "ASSETS",
     "run_worker_first": true
