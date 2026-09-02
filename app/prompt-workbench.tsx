@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Copy, ExternalLink, Search, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
 import { prompts, type PromptItem } from "./prompt-data";
 import { nonprofitPrompts } from "./nonprofit-prompt-data";
@@ -95,6 +95,11 @@ export default function PromptWorkbench() {
   const [query, setQuery] = useState("");
   const [tool, setTool] = useState<"All" | ToolId>("All");
   const [outcome, setOutcome] = useState("All");
+
+  useEffect(() => {
+    const deepLinkQuery = new URLSearchParams(window.location.search).get("q")?.trim();
+    if (deepLinkQuery) setQuery(deepLinkQuery);
+  }, []);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
