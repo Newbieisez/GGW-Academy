@@ -102,3 +102,26 @@ test("legal layer, connector anchor, and accessibility safeguards are globally a
   assert.match(a11y, /focus-visible/);
   assert.match(a11y, /prefers-reduced-motion/);
 });
+
+test("production Cloudflare config protects identity boundaries and targets the GGW hostname", async () => {
+  const [worker, wrangler, vite, launch] = await Promise.all([
+    read("worker/index.ts"),
+    read("wrangler.jsonc"),
+    read("vite.config.ts"),
+    read("docs/PRODUCTION_LAUNCH.md"),
+  ]);
+
+  assert.match(wrangler, /"name":\s*"ggw-ai-workbench"/);
+  assert.match(wrangler, /"pattern":\s*"ggw\.its-ez\.com"/);
+  assert.match(wrangler, /"custom_domain":\s*true/);
+  assert.match(wrangler, /"binding":\s*"ASSETS"/);
+  assert.match(wrangler, /"binding":\s*"IMAGES"/);
+  assert.match(worker, /TRUSTED_IDENTITY_HEADERS/);
+  assert.match(worker, /headers\.delete\(header\)/);
+  assert.match(worker, /ctx\.access\.getIdentity\(\)/);
+  assert.match(worker, /oai-authenticated-user-email/);
+  assert.match(worker, /X-Content-Type-Options/);
+  assert.doesNotMatch(vite, /SITE_CREATOR_PLACEHOLDER_DATABASE_ID/);
+  assert.match(launch, /Protect this Worker behind Access/);
+  assert.match(launch, /GEMINI_API_KEY/);
+});
