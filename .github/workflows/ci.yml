@@ -28,5 +28,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Component contract tests
-        run: node --test tests/ui-components.test.mjs
+      - name: Portal and component contract tests
+        run: node --test tests/*.test.mjs
