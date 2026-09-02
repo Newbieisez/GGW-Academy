@@ -1,4 +1,4 @@
-name: GGW AI Academy checks
+name: GGW AI Workbench checks
 
 on:
   push:
