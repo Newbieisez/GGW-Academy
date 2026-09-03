@@ -47,7 +47,7 @@ test("operational workbench routes are present", async () => {
     read("app/workbench/actions/page.tsx"),
   ]);
 
-  assert.match(hub, /GGW Operations Workbenches/);
+  assert.match(hub, /GGW Operations Workbench/);
   assert.match(hub, /\/data-cleanup/);
   assert.match(hub, /\/workbench\/outreach/);
   assert.match(hub, /\/workbench\/batch-outreach/);
