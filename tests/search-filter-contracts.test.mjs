@@ -23,7 +23,8 @@ test("member renewal is backed by real prompt content and semantic aliases", asy
   ]);
   assert.match(workbench, /"member renewal"/);
   assert.match(workbench, /member:\s*\["member", "members", "membership"\]/);
-  assert.match(workbench, /renewal:\s*\["renew", "renewal", "renewing"\]/);
+  assert.match(workbench, /renewal:\s*\["renew", "renewal", "renewing"/);
+  assert.match(workbench, /re-engagement/);
   assert.match(workbench, /terms\.every\(\(term\) => termMatches\(haystack, term\)\)/);
   assert.match(data, /renewal-campaign/);
   assert.match(data, /Build a renewal campaign by segment/);
@@ -40,6 +41,8 @@ test("Prompt Library dropdowns only expose content-backed options and counts", a
   assert.match(workbench, /filter\(\(item\) => item\.count > 0\)/);
   assert.match(workbench, /changeTool/);
   assert.match(workbench, /changeOutcome/);
+  assert.match(workbench, /usingFallback \? libraryPrompts : directMatches/);
+  assert.doesNotMatch(workbench, /No matching prompt yet/);
 });
 
 test("Google Calendar reporting gap is filled with substantive GGW prompts", async () => {
@@ -52,10 +55,11 @@ test("Google Calendar reporting gap is filled with substantive GGW prompts", asy
 });
 
 test("Outlook and Microsoft Copilot are first-class, content-backed options", async () => {
-  const [registry, expansion, home] = await Promise.all([
+  const [registry, expansion, home, hub] = await Promise.all([
     read("app/tool-registry.ts"),
     read("app/platform-expansion-prompt-data.ts"),
     read("app/ggw-workbench.tsx"),
+    read("app/google-workspace-hub.tsx"),
   ]);
   assert.match(registry, /\| "Outlook"/);
   assert.match(registry, /\| "Microsoft Copilot"/);
@@ -69,4 +73,6 @@ test("Outlook and Microsoft Copilot are first-class, content-backed options", as
   assert.match(home, /"Outlook"/);
   assert.match(home, /"Microsoft Copilot"/);
   assert.match(home, /license dependent/);
+  assert.match(hub, /PRODUCTIVITY TOOLS \+ AI/);
+  assert.match(hub, /Copilot features vary by Microsoft 365\/Copilot license/);
 });
