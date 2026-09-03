@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Copy, ExternalLink, Search, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
 import { prompts, type PromptItem } from "./prompt-data";
 import { nonprofitPrompts } from "./nonprofit-prompt-data";
-import { platformExpansionPrompts } from "./platform-expansion-prompt-data";
 import { toolRegistry, type ToolId } from "./tool-registry";
 
-const libraryPrompts = [...prompts, ...nonprofitPrompts, ...platformExpansionPrompts];
+const libraryPrompts = [...prompts, ...nonprofitPrompts];
+const libraryOutcomes = Array.from(new Set(libraryPrompts.map((item) => item.outcome)));
+const libraryTools = Array.from(new Set(libraryPrompts.flatMap((item) => item.tools)));
 const popularSearches = ["event promotion", "member renewal", "board report", "grant", "compliance", "cash flow", "fundraising", "automation"];
 
 function promptVariables(prompt: string) {
@@ -16,13 +17,6 @@ function promptVariables(prompt: string) {
 
 function prefersLongField(label: string) {
   return /(paste|facts|source|notes|data|policy|rules|requirements|materials|inputs|metrics|workflow|process|description|content|agreement)/i.test(label);
-}
-
-function matchesSearch(item: PromptItem, query: string) {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const haystack = [item.title, item.summary, item.outcome, item.prompt, ...item.tools, ...item.tags].join(" ").toLowerCase();
-  return haystack.includes(q);
 }
 
 function PromptCard({ item }: { item: PromptItem }) {
@@ -109,54 +103,31 @@ export default function PromptWorkbench() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const searchMatches = useMemo(() => libraryPrompts.filter((item) => matchesSearch(item, query)), [query]);
-
-  const toolOptions = useMemo(() => {
-    const counts = new Map<ToolId, number>();
-    for (const item of searchMatches) {
-      if (outcome !== "All" && item.outcome !== outcome) continue;
-      for (const itemTool of item.tools) counts.set(itemTool, (counts.get(itemTool) || 0) + 1);
-    }
-    return Array.from(counts.entries()).sort(([a], [b]) => toolRegistry[a].label.localeCompare(toolRegistry[b].label));
-  }, [searchMatches, outcome]);
-
-  const outcomeOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const item of searchMatches) {
-      if (tool !== "All" && !item.tools.includes(tool)) continue;
-      counts.set(item.outcome, (counts.get(item.outcome) || 0) + 1);
-    }
-    return Array.from(counts.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [searchMatches, tool]);
-
-  useEffect(() => {
-    if (tool !== "All" && !toolOptions.some(([value]) => value === tool)) setTool("All");
-  }, [tool, toolOptions]);
-
-  useEffect(() => {
-    if (outcome !== "All" && !outcomeOptions.some(([value]) => value === outcome)) setOutcome("All");
-  }, [outcome, outcomeOptions]);
-
-  const results = useMemo(() => searchMatches.filter((item) => {
-    const matchesTool = tool === "All" || item.tools.includes(tool);
-    const matchesOutcome = outcome === "All" || item.outcome === outcome;
-    return matchesTool && matchesOutcome;
-  }), [searchMatches, tool, outcome]);
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return libraryPrompts.filter((item) => {
+      const matchesTool = tool === "All" || item.tools.includes(tool);
+      const matchesOutcome = outcome === "All" || item.outcome === outcome;
+      if (!matchesTool || !matchesOutcome) return false;
+      if (!q) return true;
+      const haystack = [item.title, item.summary, item.outcome, item.prompt, ...item.tools, ...item.tags].join(" ").toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [query, tool, outcome]);
 
   const clear = () => { setQuery(""); setTool("All"); setOutcome("All"); };
-  const hasFilters = Boolean(query.trim()) || tool !== "All" || outcome !== "All";
 
   return <main className="ggw-prompt-workbench">
     <section className="ggw-pw-hero">
       <span><Sparkles size={16} /> GGW POWER PROMPT LIBRARY</span>
       <h1>Search the job. Fill the fields. Do the work.</h1>
-      <p>Search by the job in front of you—membership, events, grants, fundraising, finance, board operations, compliance, reporting, Google Workspace, Outlook, Copilot, or automation. Open a prompt, fill its variables directly in the portal, then copy a task-ready version.</p>
+      <p>Search by the job in front of you—membership, events, grants, fundraising, finance, board operations, compliance, reporting, Google Workspace, or automation. Open a prompt, fill its variables directly in the portal, then copy a task-ready version.</p>
     </section>
 
     <section className="ggw-pw-controls" aria-label="Prompt filters">
       <label className="ggw-pw-search">
         <Search size={19} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search: renewal, grant, board, compliance, cash flow, Outlook, Copilot, event follow-up…" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search: renewal, grant, board, compliance, cash flow, fundraising, event follow-up…" />
         {query && <button onClick={() => setQuery("")} aria-label="Clear search">×</button>}
       </label>
 
@@ -166,15 +137,15 @@ export default function PromptWorkbench() {
       </div>
 
       <div className="ggw-pw-selects">
-        <label><strong>Solution</strong><select value={tool} onChange={(event) => setTool(event.target.value as "All" | ToolId)}><option value="All">All solutions ({searchMatches.filter((item) => outcome === "All" || item.outcome === outcome).length})</option>{toolOptions.map(([value, count]) => <option value={value} key={value}>{toolRegistry[value].label} ({count})</option>)}</select></label>
-        <label><strong>Work outcome</strong><select value={outcome} onChange={(event) => setOutcome(event.target.value)}><option value="All">All outcomes ({searchMatches.filter((item) => tool === "All" || item.tools.includes(tool)).length})</option>{outcomeOptions.map(([value, count]) => <option value={value} key={value}>{value} ({count})</option>)}</select></label>
+        <label><strong>Solution</strong><select value={tool} onChange={(event) => setTool(event.target.value as "All" | ToolId)}><option value="All">All solutions</option>{libraryTools.map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
+        <label><strong>Work outcome</strong><select value={outcome} onChange={(event) => setOutcome(event.target.value)}><option value="All">All outcomes</option>{libraryOutcomes.map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
       </div>
 
-      <div className="ggw-pw-result-count" aria-live="polite"><strong>{results.length}</strong><span>matching prompts</span><span className="ggw-pw-total">{libraryPrompts.length} total in the library</span>{hasFilters && <button onClick={clear}>Reset filters</button>}</div>
+      <div className="ggw-pw-result-count"><strong>{results.length}</strong><span>matching prompts</span><span className="ggw-pw-total">{libraryPrompts.length} total in the library</span><button onClick={clear}>Reset filters</button></div>
     </section>
 
-    {results.length ? <section className="ggw-pw-grid">{results.map((item) => <PromptCard key={item.id} item={item} />)}</section> : <section className="ggw-pw-empty"><Search size={24} /><strong>No matching prompt yet.</strong><span>This combination should be rare because the filter menus only offer options with content. Reset the filters or try another job phrase.</span><button onClick={clear}>Show all prompts</button></section>}
+    {results.length ? <section className="ggw-pw-grid">{results.map((item) => <PromptCard key={item.id} item={item} />)}</section> : <section className="ggw-pw-empty"><Search size={24} /><strong>No matching prompt yet.</strong><span>Try a broader job word or reset the filters.</span><button onClick={clear}>Show all prompts</button></section>}
 
-    <section className="ggw-pw-foot"><ShieldCheck size={20} /><div><strong>The prompt is the accelerator, not the authority.</strong><span>WildApricot, approved Google/Microsoft files, signed agreements, official regulator/funder sources, GGW policy, and qualified professional guidance remain authoritative. Verify names, dates, links, amounts, restrictions, eligibility, recipients, claims, approvals, and compliance-sensitive decisions before use.</span></div></section>
+    <section className="ggw-pw-foot"><ShieldCheck size={20} /><div><strong>The prompt is the accelerator, not the authority.</strong><span>WildApricot, approved Google files, signed agreements, official regulator/funder sources, GGW policy, and qualified professional guidance remain authoritative. Verify names, dates, links, amounts, restrictions, eligibility, recipients, claims, approvals, and compliance-sensitive decisions before use.</span></div></section>
   </main>;
 }

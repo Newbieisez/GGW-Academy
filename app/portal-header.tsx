@@ -20,7 +20,7 @@ export default function PortalHeader() {
         <nav className="ggw-portal-nav" aria-label="Main navigation">
           <a className={!promptsActive && !legalActive ? "active" : ""} href={portalPath("/#job-aids")}>Get help</a>
           <a href={portalPath("/#nonprofit-operations")}>Run &amp; Grow GGW</a>
-          <a href={portalPath("/#google-workspace")}>Tools &amp; AI</a>
+          <a href={portalPath("/#google-workspace")}>Google &amp; AI</a>
           <a className={promptsActive ? "active" : ""} href={portalPath("/prompts")}>Prompt Library</a>
           <a href={portalPath("/#automations")}>Automations</a>
           <a href={portalPath("/#ggw-connectors-helper")}>Connect tools</a>
