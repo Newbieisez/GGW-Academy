@@ -4,6 +4,8 @@ import "./nav-overrides.css";
 import "./portal-header.css";
 import "./ggw-workbench.css";
 import "./ggw-workbench-v2.css";
+import "./home-smart-search.css";
+import "./home-microsoft-options.css";
 import "./prompt-workbench.css";
 import "./prompt-workbench-v2.css";
 import "./nonprofit-operations-hub.css";
@@ -15,8 +17,10 @@ import "./legal-footer.css";
 import "./accessibility-polish.css";
 import PortalHeader from "./portal-header";
 import GGWWorkbench from "./ggw-workbench";
+import HomeSmartSearch from "./home-smart-search";
 import NonprofitOperationsHub from "./nonprofit-operations-hub";
 import HomeGoogleWorkspaceHub from "./home-google-workspace-hub";
+import HomeMicrosoftOptions from "./home-microsoft-options";
 import CanvaHelper from "./canva-helper";
 import ConnectorGuides from "./connector-guides";
 import PortalAccount from "./portal-account";
@@ -26,7 +30,7 @@ const publicBasePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, 
 
 export const metadata: Metadata = {
   title: "GGW AI Workbench",
-  description: "A practical AI operations portal for Global Gaming Women staff using WildApricot, Google Workspace, Canva, automation tools, and approved AI.",
+  description: "A practical AI operations portal for Global Gaming Women staff using WildApricot, Google Workspace, Microsoft 365, Canva, automation tools, and approved AI.",
   icons: { icon: `${publicBasePath}/favicon.svg`, shortcut: `${publicBasePath}/favicon.svg` },
 };
 
@@ -36,8 +40,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <PortalHeader />
         <GGWWorkbench />
+        <HomeSmartSearch />
         <NonprofitOperationsHub />
         <HomeGoogleWorkspaceHub />
+        <HomeMicrosoftOptions />
         <CanvaHelper />
         <ConnectorGuides />
         <PortalAccount />
