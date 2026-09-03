@@ -8,8 +8,9 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (relativePath) => readFile(path.join(root, relativePath), "utf8");
 
 test("portal routes use the shared Workbench shell", async () => {
-  const [layout, promptsPage, legalPage, progressPage, header, a11y] = await Promise.all([
+  const [layout, shell, promptsPage, legalPage, progressPage, header, a11y] = await Promise.all([
     read("app/layout.tsx"),
+    read("app/portal-shell.tsx"),
     read("app/prompts/page.tsx"),
     read("app/legal/page.tsx"),
     read("app/progress/page.tsx"),
@@ -18,12 +19,15 @@ test("portal routes use the shared Workbench shell", async () => {
   ]);
 
   assert.match(layout, /<PortalHeader\s*\/>/);
-  assert.match(layout, /<NonprofitOperationsHub\s*\/>/);
-  assert.match(layout, /<HomeGoogleWorkspaceHub\s*\/>/);
-  assert.match(layout, /<CanvaHelper\s*\/>/);
-  assert.match(layout, /<ConnectorGuides\s*\/>/);
+  assert.match(layout, /<PortalShell\s*\/>/);
   assert.match(layout, /<LegalFooter\s*\/>/);
   assert.match(layout, /Microsoft 365/);
+  assert.match(shell, /<GGWWorkbench\s*\/>/);
+  assert.match(shell, /<NonprofitOperationsHub\s*\/>/);
+  assert.match(shell, /<HomeGoogleWorkspaceHub\s*\/>/);
+  assert.match(shell, /<CanvaHelper\s*\/>/);
+  assert.match(shell, /<ConnectorGuides\s*\/>/);
+  assert.match(shell, /const isHome/);
   assert.doesNotMatch(promptsPage, /SiteHeader|PromptLibraryView|academy-app/);
   assert.doesNotMatch(legalPage, /SiteHeader|academy-app/);
   assert.doesNotMatch(progressPage, /GGW learner|learning record|DashboardView|SiteHeader/);
@@ -32,6 +36,25 @@ test("portal routes use the shared Workbench shell", async () => {
   assert.match(header, /Run &amp; Grow GGW/);
   assert.match(header, /Tools &amp; AI/);
   assert.match(header, /Prompt Library/);
+  assert.match(header, /Workbenches/);
+});
+
+test("operational workbench routes are present", async () => {
+  const [hub, outreach, batch, actions] = await Promise.all([
+    read("app/workbench/page.tsx"),
+    read("app/workbench/outreach/page.tsx"),
+    read("app/workbench/batch-outreach/page.tsx"),
+    read("app/workbench/actions/page.tsx"),
+  ]);
+
+  assert.match(hub, /GGW Operations Workbenches/);
+  assert.match(hub, /\/data-cleanup/);
+  assert.match(hub, /\/workbench\/outreach/);
+  assert.match(hub, /\/workbench\/batch-outreach/);
+  assert.match(hub, /\/workbench\/actions/);
+  assert.match(outreach, /Write One Message/);
+  assert.match(batch, /Contact a Group/);
+  assert.match(actions, /Meeting/);
 });
 
 test("homepage does not expose a non-functional search bar and only shows populated categories", async () => {
@@ -194,7 +217,8 @@ test("production Cloudflare config protects identity boundaries and targets the 
   assert.match(worker, /TRUSTED_IDENTITY_HEADERS/);
   assert.match(worker, /headers\.delete\(header\)/);
   assert.match(worker, /ctx\.access\.getIdentity\(\)/);
-  assert.match(worker, /cf-access-jwt-assertion/);
+  assert.match(worker, /isProtectedPath/);
+  assert.match(worker, /@globalgamingwomen\.org/);
   assert.match(worker, /cf-access-authenticated-user-email/);
   assert.match(worker, /oai-authenticated-user-email/);
   assert.match(worker, /X-Content-Type-Options/);
