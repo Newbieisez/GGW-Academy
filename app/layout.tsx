@@ -26,7 +26,7 @@ const publicBasePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, 
 
 export const metadata: Metadata = {
   title: "GGW AI Workbench",
-  description: "A practical AI operations portal for Global Gaming Women staff using WildApricot, Google Workspace, Canva, automation tools, and approved AI.",
+  description: "A practical AI operations portal for Global Gaming Women staff using WildApricot, Google Workspace, Microsoft 365, Canva, automation tools, and approved AI.",
   icons: { icon: `${publicBasePath}/favicon.svg`, shortcut: `${publicBasePath}/favicon.svg` },
 };
 
