@@ -5,9 +5,15 @@ export type GGWUser = {
   displayName: string;
 };
 
+const OWNER_EMAIL = "erezhaimowicz@gmail.com";
+
+function isAllowedGGWIdentity(email: string): boolean {
+  return email === OWNER_EMAIL || email.endsWith("@globalgamingwomen.org");
+}
+
 /**
- * Validates request headers reconstructed exclusively from verified Cloudflare Access identity.
- * Rejects any request that lacks verified @globalgamingwomen.org credentials.
+ * Validates request headers reconstructed from verified Cloudflare Access identity.
+ * Allows GGW staff accounts plus the explicit owner/admin Gmail account.
  */
 export function requireVerifiedGGWUser(request: Request): GGWUser | null {
   const email = request.headers
@@ -15,7 +21,7 @@ export function requireVerifiedGGWUser(request: Request): GGWUser | null {
     ?.trim()
     .toLowerCase();
 
-  if (!email || !email.endsWith("@globalgamingwomen.org")) {
+  if (!email || !isAllowedGGWIdentity(email)) {
     return null;
   }
 
@@ -32,7 +38,7 @@ export function requireVerifiedGGWUser(request: Request): GGWUser | null {
 /** Fail-closed API response for missing or unauthorized GGW identity. */
 export function unauthorizedResponse() {
   return NextResponse.json(
-    { error: "Unauthorized: GGW staff credentials required." },
+    { error: "Unauthorized: approved GGW credentials required." },
     {
       status: 401,
       headers: {
