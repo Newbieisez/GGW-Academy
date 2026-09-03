@@ -18,6 +18,8 @@ const popularSearches = [
   "cash flow",
   "fundraising",
   "automation",
+  "Outlook email",
+  "Copilot",
 ];
 
 const stopWords = new Set(["a", "an", "and", "for", "from", "in", "of", "on", "the", "to", "with", "ggw"]);
@@ -25,9 +27,9 @@ const searchAliases: Record<string, string[]> = {
   member: ["member", "members", "membership"],
   members: ["member", "members", "membership"],
   membership: ["member", "members", "membership"],
-  renew: ["renew", "renewal", "renewing"],
-  renewal: ["renew", "renewal", "renewing"],
-  renewals: ["renew", "renewal", "renewing"],
+  renew: ["renew", "renewal", "renewing", "re-engagement", "reengagement"],
+  renewal: ["renew", "renewal", "renewing", "re-engagement", "reengagement"],
+  renewals: ["renew", "renewal", "renewing", "re-engagement", "reengagement"],
   event: ["event", "events", "registration", "attendee"],
   events: ["event", "events", "registration", "attendee"],
   board: ["board", "governance", "committee", "trustee"],
@@ -44,7 +46,7 @@ const searchAliases: Record<string, string[]> = {
   finance: ["finance", "financial", "budget", "cash", "expense", "fund"],
   automation: ["automation", "automate", "zapier", "make", "workflow"],
   automate: ["automation", "automate", "zapier", "make", "workflow"],
-  outlook: ["outlook", "microsoft", "copilot", "email"],
+  outlook: ["outlook", "microsoft", "email"],
   copilot: ["copilot", "microsoft", "outlook"],
 };
 
@@ -156,31 +158,36 @@ export default function PromptWorkbench() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const searchMatches = useMemo(() => libraryPrompts.filter((item) => matchesSearch(item, query)), [query]);
+  const directMatches = useMemo(() => libraryPrompts.filter((item) => matchesSearch(item, query)), [query]);
+  const usingFallback = Boolean(query.trim()) && directMatches.length === 0;
+  const searchablePrompts = usingFallback ? libraryPrompts : directMatches;
 
   const toolOptions = useMemo(() => {
     const counts = new Map<ToolId, number>();
-    for (const item of searchMatches) {
+    for (const item of searchablePrompts) {
       if (outcome !== "All" && item.outcome !== outcome) continue;
       for (const itemTool of item.tools) counts.set(itemTool, (counts.get(itemTool) || 0) + 1);
     }
     return Array.from(counts.entries()).sort(([a], [b]) => toolRegistry[a].label.localeCompare(toolRegistry[b].label));
-  }, [searchMatches, outcome]);
+  }, [searchablePrompts, outcome]);
 
   const outcomeOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const item of searchMatches) {
+    for (const item of searchablePrompts) {
       if (tool !== "All" && !item.tools.includes(tool)) continue;
       counts.set(item.outcome, (counts.get(item.outcome) || 0) + 1);
     }
     return Array.from(counts.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [searchMatches, tool]);
+  }, [searchablePrompts, tool]);
 
-  const results = useMemo(() => searchMatches.filter((item) => {
+  const filteredResults = useMemo(() => searchablePrompts.filter((item) => {
     const matchesTool = tool === "All" || item.tools.includes(tool);
     const matchesOutcome = outcome === "All" || item.outcome === outcome;
     return matchesTool && matchesOutcome;
-  }), [searchMatches, tool, outcome]);
+  }), [searchablePrompts, tool, outcome]);
+
+  const results = filteredResults.length ? filteredResults : libraryPrompts;
+  const recoveredFromEmpty = filteredResults.length === 0;
 
   const changeQuery = (value: string) => {
     setQuery(value);
@@ -190,12 +197,12 @@ export default function PromptWorkbench() {
 
   const changeTool = (value: "All" | ToolId) => {
     setTool(value);
-    if (value !== "All" && outcome !== "All" && !searchMatches.some((item) => item.tools.includes(value) && item.outcome === outcome)) setOutcome("All");
+    if (value !== "All" && outcome !== "All" && !searchablePrompts.some((item) => item.tools.includes(value) && item.outcome === outcome)) setOutcome("All");
   };
 
   const changeOutcome = (value: string) => {
     setOutcome(value);
-    if (value !== "All" && tool !== "All" && !searchMatches.some((item) => item.outcome === value && item.tools.includes(tool))) setTool("All");
+    if (value !== "All" && tool !== "All" && !searchablePrompts.some((item) => item.outcome === value && item.tools.includes(tool))) setTool("All");
   };
 
   const clear = () => { setQuery(""); setTool("All"); setOutcome("All"); };
@@ -205,7 +212,7 @@ export default function PromptWorkbench() {
     <section className="ggw-pw-hero">
       <span><Sparkles size={16} /> GGW POWER PROMPT LIBRARY</span>
       <h1>Find the job. Fill the fields. Do the work.</h1>
-      <p>Use plain job language such as member renewal, event follow-up, board report, grant reporting, Outlook email, compliance, or cash flow. The library matches the meaning across titles, tools, tags, outcomes, and prompt content.</p>
+      <p>Use plain job language such as member renewal, event follow-up, board report, grant reporting, Outlook email, compliance, or cash flow. The library matches across titles, tools, tags, outcomes, and prompt content.</p>
     </section>
 
     <section className="ggw-pw-controls" aria-label="Prompt filters">
@@ -221,14 +228,21 @@ export default function PromptWorkbench() {
       </div>
 
       <div className="ggw-pw-selects">
-        <label><strong>Solution</strong><select value={tool} onChange={(event) => changeTool(event.target.value as "All" | ToolId)}><option value="All">All solutions ({searchMatches.filter((item) => outcome === "All" || item.outcome === outcome).length})</option>{toolOptions.map(([value, count]) => <option value={value} key={value}>{toolRegistry[value].label} ({count})</option>)}</select></label>
-        <label><strong>Work outcome</strong><select value={outcome} onChange={(event) => changeOutcome(event.target.value)}><option value="All">All outcomes ({searchMatches.filter((item) => tool === "All" || item.tools.includes(tool)).length})</option>{outcomeOptions.map(([value, count]) => <option value={value} key={value}>{value} ({count})</option>)}</select></label>
+        <label><strong>Solution</strong><select value={tool} onChange={(event) => changeTool(event.target.value as "All" | ToolId)}><option value="All">All solutions ({searchablePrompts.filter((item) => outcome === "All" || item.outcome === outcome).length})</option>{toolOptions.map(([value, count]) => <option value={value} key={value}>{toolRegistry[value].label} ({count})</option>)}</select></label>
+        <label><strong>Work outcome</strong><select value={outcome} onChange={(event) => changeOutcome(event.target.value)}><option value="All">All outcomes ({searchablePrompts.filter((item) => tool === "All" || item.tools.includes(tool)).length})</option>{outcomeOptions.map(([value, count]) => <option value={value} key={value}>{value} ({count})</option>)}</select></label>
       </div>
 
-      <div className="ggw-pw-result-count" aria-live="polite"><strong>{results.length}</strong><span>matching prompts</span><span className="ggw-pw-total">{libraryPrompts.length} total in the library</span><button onClick={clear}>Reset filters</button></div>
+      <div className="ggw-pw-result-count" aria-live="polite">
+        {usingFallback || recoveredFromEmpty
+          ? <><strong>{results.length}</strong><span>available prompts shown — no dead end</span></>
+          : <><strong>{results.length}</strong><span>matching prompts</span></>}
+        <span className="ggw-pw-total">{libraryPrompts.length} total in the library</span>
+        <button onClick={clear}>Reset filters</button>
+      </div>
+      {usingFallback && <p className="ggw-pw-search-note">No direct match for “{query}”. The library is showing available GGW prompts instead of an empty result screen. Try a common job button or choose a solution/outcome.</p>}
     </section>
 
-    {results.length ? <section className="ggw-pw-grid">{results.map((item) => <PromptCard key={item.id} item={item} />)}</section> : <section className="ggw-pw-empty"><Search size={24} /><strong>No direct match for that phrase.</strong><span>The dropdown filters never offer empty combinations. Try one broader job term, or reset to see the full library.</span><button onClick={clear}>Show all prompts</button></section>}
+    <section className="ggw-pw-grid">{results.map((item) => <PromptCard key={item.id} item={item} />)}</section>
 
     <section className="ggw-pw-foot"><ShieldCheck size={20} /><div><strong>The prompt is the accelerator, not the authority.</strong><span>WildApricot, approved Google or Microsoft files, signed agreements, official regulator/funder sources, GGW policy, and qualified professional guidance remain authoritative. Verify names, dates, links, amounts, restrictions, eligibility, recipients, claims, approvals, and compliance-sensitive decisions before use.</span></div></section>
   </main>;
