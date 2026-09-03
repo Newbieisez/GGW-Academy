@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { requireVerifiedGGWUser, unauthorizedResponse } from "@/lib/require-ggw-user";
 
 type ChatPayload = {
   message?: unknown;
@@ -16,6 +17,9 @@ type GeminiResponse = {
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const MAX_MESSAGE_LENGTH = 2_000;
 const VALID_MODULES = new Set(["daily", "data", "visuals", "automation", "agents", "governance"]);
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 const SYSTEM_INSTRUCTION = [
   "You are the AI helper inside the Global Gaming Women AI Workbench.",
@@ -29,6 +33,18 @@ const SYSTEM_INSTRUCTION = [
   "If a Google or third-party feature may depend on plan, language, administrator settings, permissions, or rollout, say so and give a way to verify availability.",
   "If the question is unclear, ask one focused clarifying question instead of guessing.",
 ].join(" ");
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const record = rateLimitStore.get(key);
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (record.count >= RATE_LIMIT_MAX_REQUESTS) return false;
+  record.count += 1;
+  return true;
+}
 
 function getBindingValue(name: string): string {
   const bindings = env as unknown as Record<string, unknown>;
@@ -51,27 +67,40 @@ function extractText(payload: GeminiResponse): string {
     .slice(0, 8_000);
 }
 
+function noStoreJson(body: unknown, init?: ResponseInit): Response {
+  const headers = new Headers(init?.headers);
+  headers.set("Cache-Control", "no-store");
+  return Response.json(body, { ...init, headers });
+}
+
 export async function POST(request: Request) {
-  const identity = request.headers.get("oai-authenticated-user-email")?.trim();
-  if (!identity) {
-    return Response.json({ configured: false, reply: "Please sign in through the approved GGW account before using the AI helper." }, { status: 401 });
+  // Authentication is always checked before rate limiting, body parsing, or model execution.
+  const user = requireVerifiedGGWUser(request);
+  if (!user) return unauthorizedResponse();
+
+  const clientIdentifier = request.headers.get("cf-connecting-ip")?.trim() || user.email;
+  if (!checkRateLimit(clientIdentifier)) {
+    return noStoreJson({ error: "Rate limit exceeded. Please try again later." }, { status: 429 });
   }
 
   let payload: ChatPayload;
   try {
     payload = await request.json() as ChatPayload;
   } catch {
-    return Response.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return noStoreJson({ error: "Request body must be valid JSON." }, { status: 400 });
   }
 
-  const message = typeof payload.message === "string" ? payload.message.trim().slice(0, MAX_MESSAGE_LENGTH) : "";
-  if (!message) return Response.json({ error: "Ask one question to start." }, { status: 400 });
+  const message = typeof payload.message === "string" ? payload.message.trim() : "";
+  if (!message) return noStoreJson({ error: "Ask one question to start." }, { status: 400 });
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return noStoreJson({ error: `Questions are limited to ${MAX_MESSAGE_LENGTH.toLocaleString()} characters.` }, { status: 400 });
+  }
 
   const apiKey = getBindingValue("GEMINI_API_KEY");
   const configuredModel = getBindingValue("GEMINI_MODEL");
   const model = /^[a-zA-Z0-9._-]{1,80}$/.test(configuredModel) ? configuredModel : DEFAULT_MODEL;
   if (!apiKey) {
-    return Response.json({
+    return noStoreJson({
       configured: false,
       model,
       reply: "The secure AI helper is not connected on this deployment yet. Use the Prompt Library for task-ready prompts, keep authoritative source files in control, and verify the result before taking action.",
@@ -97,15 +126,15 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      return Response.json({ configured: true, error: "The AI helper is temporarily unavailable. Try again in a moment or use a prompt from the library." }, { status: 502 });
+      return noStoreJson({ configured: true, error: "The AI helper is temporarily unavailable. Try again in a moment or use a prompt from the library." }, { status: 502 });
     }
 
     const result = await response.json() as GeminiResponse;
     const reply = extractText(result);
-    if (!reply) return Response.json({ configured: true, error: "The AI helper returned no answer. Try asking one smaller question." }, { status: 502 });
-    return Response.json({ configured: true, model, reply });
+    if (!reply) return noStoreJson({ configured: true, error: "The AI helper returned no answer. Try asking one smaller question." }, { status: 502 });
+    return noStoreJson({ configured: true, model, reply });
   } catch {
-    return Response.json({ configured: true, error: "The AI connection timed out. Try again or use the Prompt Library." }, { status: 502 });
+    return noStoreJson({ configured: true, error: "The AI connection timed out. Try again or use the Prompt Library." }, { status: 502 });
   } finally {
     clearTimeout(timeout);
   }
