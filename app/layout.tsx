@@ -4,6 +4,7 @@ import "./nav-overrides.css";
 import "./portal-header.css";
 import "./ggw-workbench.css";
 import "./ggw-workbench-v2.css";
+import "./expanded-job-aids.css";
 import "./prompt-workbench.css";
 import "./prompt-workbench-v2.css";
 import "./nonprofit-operations-hub.css";
@@ -15,6 +16,7 @@ import "./legal-footer.css";
 import "./accessibility-polish.css";
 import PortalHeader from "./portal-header";
 import GGWWorkbench from "./ggw-workbench";
+import ExpandedJobAids from "./expanded-job-aids";
 import NonprofitOperationsHub from "./nonprofit-operations-hub";
 import HomeGoogleWorkspaceHub from "./home-google-workspace-hub";
 import CanvaHelper from "./canva-helper";
@@ -36,6 +38,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <PortalHeader />
         <GGWWorkbench />
+        <ExpandedJobAids />
         <NonprofitOperationsHub />
         <HomeGoogleWorkspaceHub />
         <CanvaHelper />

@@ -1,3 +1,5 @@
+import "./prompt-depth-runtime";
+
 export type ToolId =
   | "WildApricot"
   | "Gmail"

@@ -23,6 +23,14 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "off",
     },
   },
+  {
+    files: ["app/expanded-job-aids.tsx"],
+    rules: {
+      // This component bridges into the existing job-aid DOM node with a React portal.
+      // The one-time target discovery is intentional external-DOM synchronization.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
