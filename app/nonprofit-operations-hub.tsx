@@ -82,7 +82,7 @@ export default function NonprofitOperationsHub() {
           <h2>AI support for the nonprofit work behind the mission.</h2>
           <p>The Workbench goes beyond email and events. Use it to organize operations, grow revenue responsibly, support the board, manage programs, and keep compliance-sensitive work tied to authoritative sources and human review.</p>
         </div>
-        <a href="/prompts?q=nonprofit">Browse nonprofit prompts <ArrowRight size={14} /></a>
+        <a href="/prompts">Browse GGW prompts <ArrowRight size={14} /></a>
       </div>
       <div className="ggw-nonprofit-grid">
         {areas.map((area) => {
