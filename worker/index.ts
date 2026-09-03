@@ -32,6 +32,7 @@ interface ExecutionContext {
 
 const GGW_DOMAIN = "@globalgamingwomen.org";
 const GGW_HOSTNAME = "ggw.its-ez.com";
+const OWNER_EMAIL = "erezhaimowicz@gmail.com";
 
 const TRUSTED_IDENTITY_HEADERS = [
   "cf-access-authenticated-user-email",
@@ -51,6 +52,10 @@ function isProtectedPath(pathname: string): boolean {
     pathname.startsWith("/api/actions") ||
     pathname.startsWith("/api/gemini")
   );
+}
+
+function isAllowedGGWIdentity(email: string): boolean {
+  return email === OWNER_EMAIL || email.endsWith(GGW_DOMAIN);
 }
 
 async function verifiedAccessIdentity(request: Request, ctx: ExecutionContext): Promise<AccessIdentity | null> {
@@ -138,7 +143,7 @@ const worker = {
       if (!identity || !email) {
         return accessDenied(401, "Unauthorized");
       }
-      if (!email.endsWith(GGW_DOMAIN)) {
+      if (!isAllowedGGWIdentity(email)) {
         return accessDenied(403, "Forbidden");
       }
     }
