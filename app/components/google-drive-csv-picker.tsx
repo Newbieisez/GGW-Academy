@@ -4,10 +4,69 @@ import { useState } from "react";
 import { Cloud, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+type GoogleTokenResponse = {
+  access_token?: string;
+  error?: string;
+};
+
+type GooglePickerData = {
+  action?: string;
+  docs?: Array<{
+    id?: string;
+    name?: string;
+    mimeType?: string;
+  }>;
+};
+
+type GooglePickerView = {
+  setIncludeFolders: (value: boolean) => GooglePickerView;
+  setSelectFolderEnabled: (value: boolean) => GooglePickerView;
+  setMimeTypes: (value: string) => GooglePickerView;
+};
+
+type GooglePicker = {
+  setVisible: (value: boolean) => void;
+};
+
+type GooglePickerBuilder = {
+  addView: (view: GooglePickerView) => GooglePickerBuilder;
+  setOAuthToken: (token: string) => GooglePickerBuilder;
+  setDeveloperKey: (key: string) => GooglePickerBuilder;
+  setTitle: (title: string) => GooglePickerBuilder;
+  setCallback: (callback: (data: GooglePickerData) => void | Promise<void>) => GooglePickerBuilder;
+  build: () => GooglePicker;
+};
+
+type GoogleApi = {
+  accounts?: {
+    oauth2?: {
+      initTokenClient: (config: {
+        client_id: string;
+        scope: string;
+        callback: (tokenResponse: GoogleTokenResponse) => void | Promise<void>;
+      }) => {
+        requestAccessToken: (options: { prompt: string }) => void;
+      };
+    };
+  };
+  picker: {
+    DocsView: new () => GooglePickerView;
+    PickerBuilder: new () => GooglePickerBuilder;
+    Action: {
+      CANCEL: string;
+      PICKED: string;
+    };
+  };
+};
+
+type GapiApi = {
+  load: (name: string, callback: () => void) => void;
+};
+
 declare global {
   interface Window {
-    google?: any;
-    gapi?: any;
+    google?: GoogleApi;
+    gapi?: GapiApi;
   }
 }
 
@@ -58,7 +117,7 @@ export default function GoogleDriveCsvPicker({ onCsv, disabled, label = "Choose 
       const tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
         scope: "https://www.googleapis.com/auth/drive.readonly",
-        callback: async (tokenResponse: { access_token?: string; error?: string }) => {
+        callback: async (tokenResponse: GoogleTokenResponse) => {
           if (!tokenResponse.access_token) {
             setBusy(false);
             setError(tokenResponse.error || "Google Drive authorization was not completed.");
@@ -76,7 +135,7 @@ export default function GoogleDriveCsvPicker({ onCsv, disabled, label = "Choose 
               .setOAuthToken(tokenResponse.access_token)
               .setDeveloperKey(API_KEY)
               .setTitle("Choose a GGW CSV or Google Sheet")
-              .setCallback(async (data: any) => {
+              .setCallback(async (data: GooglePickerData) => {
                 if (data.action === google.picker.Action.CANCEL) {
                   setBusy(false);
                   return;
