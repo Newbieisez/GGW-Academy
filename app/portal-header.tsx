@@ -19,12 +19,12 @@ export default function PortalHeader() {
           <span><strong>AI Workbench</strong><small>Global Gaming Women</small></span>
         </a>
         <nav className="ggw-portal-nav" aria-label="Main navigation">
-          <a className={workbenchActive ? "active" : ""} href={portalPath("/workbench")}>Workbenches</a>
           <a className={!workbenchActive && !promptsActive && !legalActive ? "active" : ""} href={portalPath("/#job-aids")}>Get help</a>
           <a href={portalPath("/#nonprofit-operations")}>Run &amp; Grow GGW</a>
           <a href={portalPath("/#google-workspace")}>Tools &amp; AI</a>
           <a className={promptsActive ? "active" : ""} href={portalPath("/prompts")}>Prompt Library</a>
           <a href={portalPath("/#automations")}>Automations</a>
+          <a className={workbenchActive ? "active" : ""} href={portalPath("/workbench")}>Workbenches</a>
         </nav>
       </div>
     </header>
