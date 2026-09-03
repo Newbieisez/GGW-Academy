@@ -15,13 +15,7 @@ import "./portal-account.css";
 import "./legal-footer.css";
 import "./accessibility-polish.css";
 import PortalHeader from "./portal-header";
-import GGWWorkbench from "./ggw-workbench";
-import ExpandedJobAids from "./expanded-job-aids";
-import NonprofitOperationsHub from "./nonprofit-operations-hub";
-import HomeGoogleWorkspaceHub from "./home-google-workspace-hub";
-import CanvaHelper from "./canva-helper";
-import ConnectorGuides from "./connector-guides";
-import PortalAccount from "./portal-account";
+import PortalShell from "./portal-shell";
 import LegalFooter from "./legal-footer";
 
 const publicBasePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
@@ -37,13 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         <PortalHeader />
-        <GGWWorkbench />
-        <ExpandedJobAids />
-        <NonprofitOperationsHub />
-        <HomeGoogleWorkspaceHub />
-        <CanvaHelper />
-        <ConnectorGuides />
-        <PortalAccount />
+        <PortalShell />
         {children}
         <LegalFooter />
       </body>
