@@ -13,7 +13,6 @@ import {
   FileText,
   Mail,
   Presentation,
-  Search,
   ShieldCheck,
   Sparkles,
   Users,
@@ -52,15 +51,15 @@ type AutomationAid = {
   verify: string[];
 };
 
-const categories: Array<{ id: Category; label: string }> = [
-  { id: "all", label: "All help" },
-  { id: "members", label: "Members" },
-  { id: "events", label: "Events" },
-  { id: "communications", label: "Communications" },
-  { id: "reporting", label: "Reporting" },
-  { id: "content", label: "Content" },
-  { id: "automation", label: "Automations" },
-];
+const categoryLabels: Record<Category, string> = {
+  all: "All help",
+  members: "Members",
+  events: "Events",
+  communications: "Communications",
+  reporting: "Reporting",
+  content: "Content",
+  automation: "Automations",
+};
 
 const aids: Aid[] = [
   {
@@ -75,7 +74,7 @@ const aids: Aid[] = [
     steps: [
       "Open the member record in WildApricot and confirm membership type, join date, and approved benefits.",
       "Give Gemini only the fields needed for the message using the prompt below.",
-      "Review the draft, test links and merge fields, then send from the approved GGW Gmail account.",
+      "Review the draft, test links and merge fields, then send from the approved GGW email account.",
     ],
     prompt: "Draft a personalized GGW welcome email using only these approved WildApricot fields: first name [NAME], membership type [TYPE], join date [DATE], approved benefits [BENEFITS], approved next step [NEXT STEP], and approved links [LINKS]. Keep it under 180 words, warm, confident, inclusive, and human. Return subject line, preview text, email body, CTA, and CHECK BEFORE SENDING. Do not invent benefits, discounts, events, eligibility, contacts, deadlines, or links.",
     check: ["Membership type is correct", "Benefits are approved", "Links work", "Merge fields are tested"],
@@ -308,13 +307,13 @@ const automations: AutomationAid[] = [
     id: "new-member-draft",
     title: "New member → welcome draft",
     trigger: "A new member record is created or reaches the approved status in WildApricot.",
-    outcome: "Prepare a Gmail welcome draft using only approved member fields; a person reviews and sends it.",
+    outcome: "Prepare an email welcome draft using only approved member fields; a person reviews and sends it.",
     connector: "Zapier",
     whatItIs: "Zapier connects apps with trigger-and-action workflows and is a good fit when the process is simple.",
     whyUseful: "This removes repetitive copying while keeping the final communication behind human review.",
     tools: ["WildApricot", "Zapier", "Gmail"],
-    steps: ["Confirm the current WildApricot trigger in Zapier.", "Map only first name, membership type, approved benefit/next-step fields, and stable member ID.", "Create a Gmail draft rather than auto-send.", "Add duplicate protection using the stable member ID.", "Test a normal record, duplicate, missing field, and status reversal before turning it on."],
-    aiStep: "Optional: use Gemini only to transform the approved fields into a friendly first draft. Keep the approved facts locked.",
+    steps: ["Confirm the current WildApricot trigger in Zapier.", "Map only first name, membership type, approved benefit/next-step fields, and stable member ID.", "Create an email draft rather than auto-send.", "Add duplicate protection using the stable member ID.", "Test a normal record, duplicate, missing field, and status reversal before turning it on."],
+    aiStep: "Optional: use approved AI only to transform the approved fields into a friendly first draft. Keep the approved facts locked.",
     verify: ["Trigger verified", "Minimum fields mapped", "Draft-first", "Duplicate test passed", "Owner can disable Zap"],
   },
   {
@@ -326,7 +325,7 @@ const automations: AutomationAid[] = [
     whatItIs: "Zapier is usually the lightest option for a single WildApricot event trigger feeding a Google action.",
     whyUseful: "Staff gets a visible working layer in Sheets without repeated export/paste work.",
     tools: ["WildApricot", "Zapier", "Google Sheets", "Gmail"],
-    steps: ["Verify the WildApricot registration trigger/action available in the current connector.", "Map the minimum registration fields and a stable registration ID.", "Upsert the Sheet row instead of blindly appending duplicates.", "Keep any Gmail communication in draft mode during the pilot.", "Test create, update, cancellation, duplicate, and permission failure."],
+    steps: ["Verify the WildApricot registration trigger/action available in the current connector.", "Map the minimum registration fields and a stable registration ID.", "Upsert the Sheet row instead of blindly appending duplicates.", "Keep any external communication in draft mode during the pilot.", "Test create, update, cancellation, duplicate, and permission failure."],
     aiStep: "Use AI downstream for summaries or follow-up grouping only after the approved fields reach the working Sheet.",
     verify: ["Stable ID used", "Updates do not duplicate", "Cancellations tested", "Correct Sheet/account", "Manual fallback documented"],
   },
@@ -339,7 +338,7 @@ const automations: AutomationAid[] = [
     whatItIs: "Make is useful when different statuses/levels need different routes or transformations.",
     whyUseful: "Branching logic can keep separate messages and review paths visible instead of hiding them in one giant automation.",
     tools: ["WildApricot", "Make", "Gmail", "Google Sheets"],
-    steps: ["Verify the available WildApricot change trigger in Make.", "Route only the intended statuses/levels.", "Map approved benefits and CTA from a controlled source rather than AI memory.", "Create a Gmail draft and log the stable member ID/status in a Sheet.", "Test each route plus a status reversal and unknown value."],
+    steps: ["Verify the available WildApricot change trigger in Make.", "Route only the intended statuses/levels.", "Map approved benefits and CTA from a controlled source rather than AI memory.", "Create an email draft and log the stable member ID/status in a Sheet.", "Test each route plus a status reversal and unknown value."],
     aiStep: "AI can prepare the wording after the route has selected the approved message facts.",
     verify: ["Every route tested", "Unknown values stop safely", "No invented benefits", "Draft reviewed", "Reversal handled"],
   },
@@ -373,7 +372,7 @@ const automations: AutomationAid[] = [
     id: "multi-step-google",
     title: "WildApricot activity → multi-step Google workflow",
     trigger: "A defined member/event activity needs several Google Workspace steps.",
-    outcome: "Route approved data through Sheets/Docs/Gmail with filters, logs, and human gates.",
+    outcome: "Route approved data through Sheets/Docs/email with filters, logs, and human gates.",
     connector: "Make",
     whatItIs: "Make is designed for scenarios with multiple modules, filters, branches, and error routes.",
     whyUseful: "It keeps a complex handoff inspectable without forcing a custom API build too early.",
@@ -471,17 +470,16 @@ function AutomationCard({ item }: { item: AutomationAid }) {
 }
 
 function WorkbenchHome() {
-  const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>("all");
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return aids.filter((aid) => {
-      const matchesCategory = category === "all" || aid.category === category;
-      const matchesQuery = !q || [aid.title, aid.summary, aid.useWhen, ...aid.tools, aid.prompt, aid.category].join(" ").toLowerCase().includes(q);
-      return matchesCategory && matchesQuery;
-    });
-  }, [query, category]);
-
+  const availableCategories = useMemo(() => {
+    const order: Category[] = ["all", "members", "events", "communications", "reporting", "content", "automation"];
+    return order.map((id) => ({
+      id,
+      label: categoryLabels[id],
+      count: id === "all" ? aids.length : aids.filter((aid) => aid.category === id).length,
+    })).filter((item) => item.count > 0);
+  }, []);
+  const filtered = useMemo(() => category === "all" ? aids : aids.filter((aid) => aid.category === category), [category]);
   const jumpTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return <main className="ggw-workbench">
@@ -489,36 +487,41 @@ function WorkbenchHome() {
       <div className="ggw-workbench-hero-copy">
         <span className="ggw-kicker"><Sparkles size={16} /> GGW AI Workbench</span>
         <h1>What do you need help with?</h1>
-        <p>Search the job in front of you. Get the steps, the prompt, the right tool, and the check before you use the result.</p>
-        <div className="ggw-workbench-search"><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try: member renewal, event follow-up, clean a Sheet, sponsor email, automate…" aria-label="Search GGW AI job aids" />{query && <button onClick={() => setQuery("")} aria-label="Clear search">×</button>}</div>
-        <div className="ggw-hero-actions"><a href="/prompts">Open Prompt Library <ArrowRight size={15} /></a><button onClick={() => jumpTo("google-workspace")}>Explore Google tools</button><span>Browser-first on Mac or Windows.</span></div>
+        <p>Choose the work area below, open the exact job aid, or go straight to the Prompt Library for deeper nonprofit, reporting, compliance, Google Workspace, Outlook, Copilot, and automation support.</p>
+        <div className="ggw-hero-actions"><a href="/prompts">Open Prompt Library <ArrowRight size={15} /></a><button onClick={() => jumpTo("google-workspace")}>Explore tools</button><span>Browser-first on Mac or Windows.</span></div>
       </div>
       <div className="ggw-workbench-hero-card">
         <strong>The GGW way to use AI</strong>
         <div><span>1</span><p><b>Start with the job</b>What are you trying to get done?</p></div>
-        <div><span>2</span><p><b>Use the source</b>WildApricot or the approved Google file stays authoritative.</p></div>
+        <div><span>2</span><p><b>Use the source</b>WildApricot or the approved organizational file stays authoritative.</p></div>
         <div><span>3</span><p><b>Check before action</b>Review names, dates, links, amounts, recipients, claims, and commitments.</p></div>
       </div>
     </section>
 
     <section className="ggw-tool-strip" aria-label="Open the GGW work environment">
-      {(["WildApricot", "Google Sheets", "Gmail", "Google Docs", "Google Drive", "Gemini"] as ToolId[]).map((tool) => {
+      {(["WildApricot", "Google Sheets", "Gmail", "Outlook", "Google Docs", "Google Drive", "Gemini", "Microsoft Copilot"] as ToolId[]).map((tool) => {
         const item = toolRegistry[tool];
-        return <a key={tool} href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>{tool === "WildApricot" ? "Members, events, registrations" : tool === "Google Sheets" ? "Working data, analysis, trackers" : tool === "Gmail" ? "Reviewed communication" : tool === "Google Docs" ? "Briefs, SOPs, board docs" : tool === "Google Drive" ? "Approved source files" : "Draft, analyze, organize, review"}</span><ExternalLink size={12} /></a>;
+        const description = tool === "WildApricot" ? "Members, events, registrations"
+          : tool === "Google Sheets" ? "Working data, analysis, trackers"
+          : tool === "Gmail" || tool === "Outlook" ? "Reviewed staff communication"
+          : tool === "Google Docs" ? "Briefs, SOPs, board docs"
+          : tool === "Google Drive" ? "Approved source files"
+          : tool === "Microsoft Copilot" ? "Microsoft 365 AI, license dependent"
+          : "Draft, analyze, organize, review";
+        return <a key={tool} href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>{description}</span><ExternalLink size={12} /></a>;
       })}
     </section>
 
     <section className="ggw-aids-section" id="job-aids">
-      <div className="ggw-section-head"><div><span>Fast help for real GGW work</span><h2>Choose the job, not the course.</h2></div><small>{filtered.length} job aid{filtered.length === 1 ? "" : "s"}</small></div>
-      <div className="ggw-filter-row" aria-label="Filter job aids">{categories.map((item) => <button key={item.id} className={category === item.id ? "active" : ""} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>
+      <div className="ggw-section-head"><div><span>Fast help for real GGW work</span><h2>Choose a work area and get the job done.</h2></div><small>{filtered.length} job aid{filtered.length === 1 ? "" : "s"}</small></div>
+      <div className="ggw-filter-row" aria-label="Filter job aids">{availableCategories.map((item) => <button key={item.id} className={category === item.id ? "active" : ""} onClick={() => setCategory(item.id)}>{item.label} <span>({item.count})</span></button>)}</div>
       <div className="ggw-aid-list">{filtered.map((aid) => <AidCard key={aid.id} aid={aid} />)}</div>
-      {!filtered.length && <div className="ggw-empty"><Search size={20} /><strong>No exact match.</strong><span>Try a broader job like member, event, email, Sheet, report, content, or automation—or search the full Prompt Library.</span><a href="/prompts">Search Prompt Library</a></div>}
     </section>
 
     <section className="ggw-automation-section" id="automations">
-      <div className="ggw-section-head"><div><span>WildApricot + Google automations</span><h2>Stop repeating the handoff.</h2><p>WildApricot remains the system of record. Connectors move only the information needed into Google Workspace, where AI can prepare a draft, summary, group, or review item.</p></div></div>
+      <div className="ggw-section-head"><div><span>WildApricot + productivity automations</span><h2>Stop repeating the handoff.</h2><p>WildApricot remains the system of record. Connectors move only the information needed into the approved work environment, where AI can prepare a draft, summary, group, or review item.</p></div></div>
       <div className="ggw-connector-strip">
-        <a href={toolRegistry.Zapier.url} target="_blank" rel="noreferrer"><b>Zapier</b><span>Best for a simple trigger → Google action</span></a>
+        <a href={toolRegistry.Zapier.url} target="_blank" rel="noreferrer"><b>Zapier</b><span>Best for a simple trigger → app action</span></a>
         <a href={toolRegistry.Make.url} target="_blank" rel="noreferrer"><b>Make</b><span>Best for several steps, filters, or branches</span></a>
         <div><b>Webhook / API</b><span>Advanced; use only for a real connector gap</span></div>
       </div>
@@ -527,11 +530,11 @@ function WorkbenchHome() {
 
     <section className="ggw-os-note">
       <strong>Mac or Windows?</strong>
-      <span>The Workbench teaches browser and Google Workspace steps first. When a keyboard shortcut matters, use ⌘ on Mac or Ctrl on Windows. The workflow itself should not change.</span>
+      <span>The Workbench teaches browser-first steps. When a keyboard shortcut matters, use ⌘ on Mac or Ctrl on Windows. The workflow itself should not change.</span>
     </section>
 
     <section className="ggw-bottom-cta">
-      <div><Sparkles size={21} /><span><strong>Already know what you need?</strong> The Prompt Library is the fastest path when the workflow itself is familiar.</span></div>
+      <div><Sparkles size={21} /><span><strong>Need something more specific?</strong> The Prompt Library contains deeper job-specific prompts and lets staff fill prompt variables directly in the portal.</span></div>
       <a href="/prompts">Open Prompt Library <ArrowRight size={15} /></a>
     </section>
   </main>;
