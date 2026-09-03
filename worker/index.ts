@@ -30,6 +30,8 @@ interface ExecutionContext {
   access?: AccessContext;
 }
 
+const GGW_DOMAIN = "@globalgamingwomen.org";
+
 const TRUSTED_IDENTITY_HEADERS = [
   "cf-access-authenticated-user-email",
   "cf-access-authenticated-user-name",
@@ -38,33 +40,32 @@ const TRUSTED_IDENTITY_HEADERS = [
   "oai-authenticated-user-full-name",
 ];
 
-async function withVerifiedIdentity(request: Request, ctx: ExecutionContext): Promise<Request> {
+function isProtectedPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/workbench") ||
+    pathname.startsWith("/data-cleanup") ||
+    pathname.startsWith("/api/academy") ||
+    pathname.startsWith("/api/cleanup") ||
+    pathname.startsWith("/api/outreach") ||
+    pathname.startsWith("/api/actions") ||
+    pathname.startsWith("/api/gemini")
+  );
+}
+
+async function verifiedAccessIdentity(ctx: ExecutionContext): Promise<AccessIdentity | null> {
+  if (!ctx.access) return null;
+  return ctx.access.getIdentity();
+}
+
+function requestWithVerifiedIdentity(request: Request, identity: AccessIdentity | null): Request {
   const headers = new Headers(request.headers);
 
-  // Cloudflare Access is the authentication authority for production.
-  // Prefer the Worker-native Access context when available. For a hostname
-  // protected as a self-hosted Access app, Cloudflare forwards the signed-in
-  // identity in Cf-Access-* headers; preserve that identity only when the
-  // Access JWT assertion is also present.
-  const forwardedAccessEmail = headers.get("cf-access-authenticated-user-email")?.trim().toLowerCase() || "";
-  const forwardedAccessName = headers.get("cf-access-authenticated-user-name")?.trim() || "";
-  const hasAccessAssertion = Boolean(headers.get("cf-access-jwt-assertion"));
-
+  // Never trust identity headers supplied by the inbound request. They are
+  // removed first and reconstructed only from the Worker-native Access context.
   for (const header of TRUSTED_IDENTITY_HEADERS) headers.delete(header);
 
-  let email = "";
-  let name = "";
-
-  if (ctx.access) {
-    const identity = await ctx.access.getIdentity();
-    email = identity?.email?.trim().toLowerCase() || "";
-    name = identity?.name?.trim() || "";
-  }
-
-  if (!email && hasAccessAssertion && forwardedAccessEmail) {
-    email = forwardedAccessEmail;
-    name = forwardedAccessName;
-  }
+  const email = identity?.email?.trim().toLowerCase() || "";
+  const name = identity?.name?.trim().slice(0, 160) || "";
 
   if (email) {
     headers.set("cf-access-authenticated-user-email", email);
@@ -93,10 +94,34 @@ function addSecurityHeaders(response: Response): Response {
   });
 }
 
+function accessDenied(status: 401 | 403, message: string): Response {
+  return addSecurityHeaders(
+    new Response(message, {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+    }),
+  );
+}
+
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const verifiedRequest = await withVerifiedIdentity(request, ctx);
-    const url = new URL(verifiedRequest.url);
+    const url = new URL(request.url);
+    const identity = await verifiedAccessIdentity(ctx);
+    const email = identity?.email?.trim().toLowerCase() || "";
+
+    if (isProtectedPath(url.pathname)) {
+      if (!identity || !email) {
+        return accessDenied(401, "Unauthorized");
+      }
+      if (!email.endsWith(GGW_DOMAIN)) {
+        return accessDenied(403, "Forbidden");
+      }
+    }
+
+    const verifiedRequest = requestWithVerifiedIdentity(request, identity);
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
