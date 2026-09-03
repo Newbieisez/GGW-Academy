@@ -14,6 +14,7 @@ import "./connector-guides.css";
 import "./portal-account.css";
 import "./legal-footer.css";
 import "./accessibility-polish.css";
+import "./workbench/workbench-theme.css";
 import PortalHeader from "./portal-header";
 import PortalShell from "./portal-shell";
 import LegalFooter from "./legal-footer";
