@@ -18,8 +18,10 @@ test("portal routes use the shared Workbench shell", async () => {
   ]);
 
   assert.match(layout, /<PortalHeader\s*\/>/);
+  assert.match(layout, /<HomeSmartSearch\s*\/>/);
   assert.match(layout, /<NonprofitOperationsHub\s*\/>/);
   assert.match(layout, /<HomeGoogleWorkspaceHub\s*\/>/);
+  assert.match(layout, /<HomeMicrosoftOptions\s*\/>/);
   assert.match(layout, /<CanvaHelper\s*\/>/);
   assert.match(layout, /<ConnectorGuides\s*\/>/);
   assert.match(layout, /<LegalFooter\s*\/>/);
@@ -57,6 +59,51 @@ test("prompt library includes nonprofit operations and inline variable completio
   assert.match(nonprofit, /nonprofit-fundraising-plan/);
   assert.match(nonprofit, /nonprofit-financial-controls/);
   assert.match(nonprofit, /nonprofit-records-retention/);
+});
+
+test("prompt filters only offer combinations backed by matching content", async () => {
+  const workbench = await read("app/prompt-workbench.tsx");
+  assert.match(workbench, /platformExpansionPrompts/);
+  assert.match(workbench, /const toolOptions = useMemo/);
+  assert.match(workbench, /const outcomeOptions = useMemo/);
+  assert.match(workbench, /toolOptions\.map\(\(\[value, count\]\)/);
+  assert.match(workbench, /outcomeOptions\.map\(\(\[value, count\]\)/);
+  assert.match(workbench, /!toolOptions\.some/);
+  assert.match(workbench, /!outcomeOptions\.some/);
+});
+
+test("expanded platform prompts cover reporting gaps plus Outlook and Microsoft Copilot", async () => {
+  const [expansion, registry, microsoft] = await Promise.all([
+    read("app/platform-expansion-prompt-data.ts"),
+    read("app/tool-registry.ts"),
+    read("app/home-microsoft-options.tsx"),
+  ]);
+
+  assert.match(expansion, /calendar-reporting-cadence/);
+  assert.match(expansion, /calendar-board-reporting-cycle/);
+  assert.match(expansion, /calendar-grant-reporting/);
+  assert.match(expansion, /forms-reporting-summary/);
+  assert.match(expansion, /drive-reporting-source-pack/);
+  assert.match(expansion, /slides-board-report/);
+  assert.match(expansion, /notebooklm-reporting-brief/);
+  assert.match(expansion, /outlook-ggw-email/);
+  assert.match(expansion, /outlook-weekly-commitments/);
+  assert.match(expansion, /copilot-weekly-ops/);
+  assert.match(expansion, /copilot-source-research/);
+  assert.match(registry, /\| "Outlook"/);
+  assert.match(registry, /\| "Microsoft Copilot"/);
+  assert.match(registry, /https:\/\/outlook\.office\.com\//);
+  assert.match(registry, /https:\/\/m365\.cloud\.microsoft\/chat/);
+  assert.match(microsoft, /Availability of Copilot features can vary/);
+  assert.match(microsoft, /Use the tools you actually work in/);
+});
+
+test("homepage search exposes live prompt results instead of silently filtering below the fold", async () => {
+  const smartSearch = await read("app/home-smart-search.tsx");
+  assert.match(smartSearch, /ggw-home-search-results/);
+  assert.match(smartSearch, /Press Enter to see all results/);
+  assert.match(smartSearch, /window\.location\.href = `\/prompts\?q=/);
+  assert.match(smartSearch, /platformExpansionPrompts/);
 });
 
 test("Google Workspace hub covers the core GGW toolset and stays home-scoped", async () => {
