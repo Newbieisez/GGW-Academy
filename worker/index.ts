@@ -31,6 +31,7 @@ interface ExecutionContext {
 }
 
 const GGW_DOMAIN = "@globalgamingwomen.org";
+const GGW_HOSTNAME = "ggw.its-ez.com";
 
 const TRUSTED_IDENTITY_HEADERS = [
   "cf-access-authenticated-user-email",
@@ -52,16 +53,37 @@ function isProtectedPath(pathname: string): boolean {
   );
 }
 
-async function verifiedAccessIdentity(ctx: ExecutionContext): Promise<AccessIdentity | null> {
-  if (!ctx.access) return null;
-  return ctx.access.getIdentity();
+async function verifiedAccessIdentity(request: Request, ctx: ExecutionContext): Promise<AccessIdentity | null> {
+  if (ctx.access) {
+    const identity = await ctx.access.getIdentity();
+    if (identity?.email) return identity;
+  }
+
+  // Cloudflare Workers with Static Assets execute behind an internal router
+  // that does not currently propagate ctx.access to the user Worker. Access
+  // still authenticates the hostname and injects the authenticated-user email
+  // header. Only accept that fallback on the protected GGW production hostname.
+  const url = new URL(request.url);
+  if (url.hostname.toLowerCase() !== GGW_HOSTNAME) return null;
+
+  const email = request.headers
+    .get("cf-access-authenticated-user-email")
+    ?.trim()
+    .toLowerCase();
+  if (!email) return null;
+
+  const name = request.headers
+    .get("cf-access-authenticated-user-name")
+    ?.trim();
+
+  return { email, name };
 }
 
 function requestWithVerifiedIdentity(request: Request, identity: AccessIdentity | null): Request {
   const headers = new Headers(request.headers);
 
-  // Never trust identity headers supplied by the inbound request. They are
-  // removed first and reconstructed only from the Worker-native Access context.
+  // Remove inbound identity headers, then reconstruct only the verified values
+  // selected by verifiedAccessIdentity().
   for (const header of TRUSTED_IDENTITY_HEADERS) headers.delete(header);
 
   const email = identity?.email?.trim().toLowerCase() || "";
@@ -109,7 +131,7 @@ function accessDenied(status: 401 | 403, message: string): Response {
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const identity = await verifiedAccessIdentity(ctx);
+    const identity = await verifiedAccessIdentity(request, ctx);
     const email = identity?.email?.trim().toLowerCase() || "";
 
     if (isProtectedPath(url.pathname)) {
