@@ -1,6 +1,7 @@
 export type ToolId =
   | "WildApricot"
   | "Gmail"
+  | "Outlook"
   | "Google Sheets"
   | "Google Docs"
   | "Google Drive"
@@ -11,6 +12,7 @@ export type ToolId =
   | "Google Sites"
   | "Google Keep"
   | "Gemini"
+  | "Microsoft Copilot"
   | "NotebookLM"
   | "Apps Script"
   | "Canva"
@@ -36,6 +38,12 @@ export const toolRegistry: Record<ToolId, ToolLink> = {
     url: "https://mail.google.com/",
     learnUrl: "https://workspace.google.com/products/gmail/ai/",
     actionLabel: "Open Gmail",
+  },
+  Outlook: {
+    label: "Outlook",
+    url: "https://outlook.office.com/",
+    learnUrl: "https://support.microsoft.com/outlook",
+    actionLabel: "Open Outlook",
   },
   "Google Sheets": {
     label: "Google Sheets",
@@ -96,6 +104,12 @@ export const toolRegistry: Record<ToolId, ToolLink> = {
     url: "https://gemini.google.com/",
     learnUrl: "https://workspace.google.com/solutions/ai/",
     actionLabel: "Open Gemini",
+  },
+  "Microsoft Copilot": {
+    label: "Microsoft Copilot",
+    url: "https://m365.cloud.microsoft/chat",
+    learnUrl: "https://support.microsoft.com/microsoft-365-copilot",
+    actionLabel: "Open Copilot",
   },
   NotebookLM: {
     label: "NotebookLM",
