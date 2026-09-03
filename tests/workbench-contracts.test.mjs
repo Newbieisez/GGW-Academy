@@ -23,14 +23,26 @@ test("portal routes use the shared Workbench shell", async () => {
   assert.match(layout, /<CanvaHelper\s*\/>/);
   assert.match(layout, /<ConnectorGuides\s*\/>/);
   assert.match(layout, /<LegalFooter\s*\/>/);
+  assert.match(layout, /Microsoft 365/);
   assert.doesNotMatch(promptsPage, /SiteHeader|PromptLibraryView|academy-app/);
   assert.doesNotMatch(legalPage, /SiteHeader|academy-app/);
   assert.doesNotMatch(progressPage, /GGW learner|learning record|DashboardView|SiteHeader/);
   assert.match(progressPage, /old learning-progress view has been retired/i);
   assert.match(a11y, /body > \.academy-app\{display:none!important\}/);
   assert.match(header, /Run &amp; Grow GGW/);
-  assert.match(header, /Google &amp; AI/);
+  assert.match(header, /Tools &amp; AI/);
   assert.match(header, /Prompt Library/);
+});
+
+test("homepage does not expose a non-functional search bar and only shows populated categories", async () => {
+  const home = await read("app/ggw-workbench.tsx");
+  assert.doesNotMatch(home, /ggw-workbench-search/);
+  assert.doesNotMatch(home, /No exact match/);
+  assert.match(home, /availableCategories/);
+  assert.match(home, /filter\(\(item\) => item\.count > 0\)/);
+  assert.match(home, /Choose a work area and get the job done/);
+  assert.match(home, /Outlook/);
+  assert.match(home, /Microsoft Copilot/);
 });
 
 test("WildApricot actions point to WildApricot, not the GGW public site", async () => {
@@ -47,6 +59,7 @@ test("prompt library includes nonprofit operations and inline variable completio
   ]);
 
   assert.match(workbench, /nonprofitPrompts/);
+  assert.match(workbench, /platformExpansionPrompts/);
   assert.match(workbench, /promptVariables/);
   assert.match(workbench, /Customize prompt/);
   assert.match(workbench, /completedPrompt/);
@@ -59,13 +72,69 @@ test("prompt library includes nonprofit operations and inline variable completio
   assert.match(nonprofit, /nonprofit-records-retention/);
 });
 
-test("Google Workspace hub covers the core GGW toolset and stays home-scoped", async () => {
+test("prompt search supports GGW job language and never offers empty curated jobs", async () => {
+  const workbench = await read("app/prompt-workbench.tsx");
+  assert.match(workbench, /"member renewal"/);
+  assert.match(workbench, /member:\s*\["member", "members", "membership"\]/);
+  assert.match(workbench, /renewal:\s*\["renew", "renewal", "renewing"/);
+  assert.match(workbench, /terms\.every\(\(term\) => termMatches\(haystack, term\)\)/);
+  assert.match(workbench, /verifiedPopularSearches/);
+  assert.match(workbench, /filter\(\(item\) => item\.count > 0\)/);
+  assert.match(workbench, /usingFallback \? libraryPrompts : directMatches/);
+  assert.match(workbench, /available prompts shown — no dead end/);
+  assert.doesNotMatch(workbench, /No matching prompt yet/);
+});
+
+test("prompt filters are dynamically backed by matching content", async () => {
+  const workbench = await read("app/prompt-workbench.tsx");
+  assert.match(workbench, /const toolOptions = useMemo/);
+  assert.match(workbench, /const outcomeOptions = useMemo/);
+  assert.match(workbench, /toolOptions\.map\(\(\[value, count\]\)/);
+  assert.match(workbench, /outcomeOptions\.map\(\(\[value, count\]\)/);
+  assert.match(workbench, /changeTool/);
+  assert.match(workbench, /changeOutcome/);
+  assert.match(workbench, /setOutcome\("All"\)/);
+  assert.match(workbench, /setTool\("All"\)/);
+});
+
+test("expanded prompt pack covers real GGW reporting, Outlook, and Copilot jobs", async () => {
+  const [expansion, registry] = await Promise.all([
+    read("app/platform-expansion-prompt-data.ts"),
+    read("app/tool-registry.ts"),
+  ]);
+
+  for (const id of [
+    "calendar-reporting-cadence",
+    "calendar-board-reporting-cycle",
+    "calendar-grant-reporting",
+    "forms-reporting-summary",
+    "meet-action-report",
+    "drive-reporting-source-pack",
+    "slides-board-report",
+    "notebooklm-reporting-brief",
+    "outlook-ggw-email",
+    "outlook-thread-actions",
+    "outlook-meeting-prep",
+    "outlook-weekly-commitments",
+    "copilot-weekly-ops",
+    "copilot-source-research",
+    "copilot-board-prep",
+  ]) assert.match(expansion, new RegExp(id));
+
+  assert.match(registry, /\| "Outlook"/);
+  assert.match(registry, /\| "Microsoft Copilot"/);
+  assert.match(registry, /https:\/\/outlook\.office\.com\//);
+  assert.match(registry, /https:\/\/m365\.cloud\.microsoft\/chat/);
+});
+
+test("productivity hub includes Google plus Microsoft options with license guardrails", async () => {
   const [hub, wrapper] = await Promise.all([
     read("app/google-workspace-hub.tsx"),
     read("app/home-google-workspace-hub.tsx"),
   ]);
   for (const product of [
     "Gmail",
+    "Outlook",
     "Google Sheets",
     "Google Docs",
     "Google Drive",
@@ -74,12 +143,15 @@ test("Google Workspace hub covers the core GGW toolset and stays home-scoped", a
     "Google Slides",
     "Google Forms",
     "Gemini",
+    "Microsoft Copilot",
     "NotebookLM",
   ]) {
     assert.match(hub, new RegExp(product.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.match(hub, /PRODUCTIVITY TOOLS \+ AI/);
   assert.match(hub, /Features worth knowing/);
   assert.match(hub, /GGW use cases/);
+  assert.match(hub, /Copilot features vary by Microsoft 365\/Copilot license/);
   assert.match(hub, /Open \{tool\.name\}/);
   assert.match(wrapper, /pathname\.includes\("\/prompts"\)/);
   assert.match(wrapper, /pathname\.includes\("\/legal"\)/);

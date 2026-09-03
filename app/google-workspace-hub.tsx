@@ -2,9 +2,10 @@
 
 import { ExternalLink, Sparkles } from "lucide-react";
 
-const googleTools = [
+const productivityTools = [
   {
     name: "Gmail",
+    vendor: "Google",
     domain: "mail.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://mail.google.com",
     purpose: "Member, event, partner, board, and volunteer communication with review before send.",
@@ -17,7 +18,20 @@ const googleTools = [
     ai: "Gemini features depend on the GGW Google Workspace plan and administrator settings.",
   },
   {
+    name: "Outlook",
+    vendor: "Microsoft",
+    domain: "outlook.office.com",
+    icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://outlook.office.com",
+    purpose: "A first-class email and calendar option for GGW staff who work in Microsoft 365 instead of Gmail.",
+    features: ["Folders, categories, search, rules, and calendar integration", "Copilot thread summaries when available", "Draft with Copilot and email coaching when licensed", "Meeting preparation and scheduling support where enabled"],
+    jobs: ["Member and partner communication", "Board and committee email", "Long-thread catch-up and action extraction", "Meeting preparation and follow-up"],
+    open: "https://outlook.office.com/",
+    learn: "https://support.microsoft.com/outlook",
+    ai: "Copilot features vary by Microsoft 365/Copilot license, Outlook version, tenant settings, and the content the signed-in user is permitted to access.",
+  },
+  {
     name: "Google Sheets",
+    vendor: "Google",
     domain: "sheets.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://sheets.google.com",
     purpose: "The primary visible working layer for exports, trackers, analysis, reconciliation, and reporting.",
@@ -31,6 +45,7 @@ const googleTools = [
   },
   {
     name: "Google Docs",
+    vendor: "Google",
     domain: "docs.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://docs.google.com",
     purpose: "Create governed working documents, SOPs, briefs, board materials, policies, and collaborative drafts.",
@@ -44,6 +59,7 @@ const googleTools = [
   },
   {
     name: "Google Drive",
+    vendor: "Google",
     domain: "drive.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://drive.google.com",
     purpose: "Store the approved sources behind GGW operations and control who can access them.",
@@ -55,6 +71,7 @@ const googleTools = [
   },
   {
     name: "Google Calendar",
+    vendor: "Google",
     domain: "calendar.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://calendar.google.com",
     purpose: "Turn deadlines, events, board meetings, grant reporting dates, and compliance obligations into visible reminders.",
@@ -68,6 +85,7 @@ const googleTools = [
   },
   {
     name: "Google Meet",
+    vendor: "Google",
     domain: "meet.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://meet.google.com",
     purpose: "Run staff, board, partner, volunteer, and event meetings with a clean follow-through workflow.",
@@ -81,6 +99,7 @@ const googleTools = [
   },
   {
     name: "Google Slides",
+    vendor: "Google",
     domain: "slides.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://slides.google.com",
     purpose: "Create board, sponsor, program, training, and event presentations from approved facts and visuals.",
@@ -94,6 +113,7 @@ const googleTools = [
   },
   {
     name: "Google Forms",
+    vendor: "Google",
     domain: "forms.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://forms.google.com",
     purpose: "Collect structured feedback, volunteer intake, surveys, internal requests, and program data into Sheets.",
@@ -107,6 +127,7 @@ const googleTools = [
   },
   {
     name: "Gemini",
+    vendor: "Google",
     domain: "gemini.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://gemini.google.com",
     purpose: "Draft, organize, summarize, analyze, brainstorm, and review while keeping authoritative GGW sources in control.",
@@ -117,7 +138,20 @@ const googleTools = [
     ai: "Never treat the model as the source of truth for legal, tax, regulatory, financial, HR, membership-status, or board decisions.",
   },
   {
+    name: "Microsoft Copilot",
+    vendor: "Microsoft",
+    domain: "m365.cloud.microsoft",
+    icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://m365.cloud.microsoft",
+    purpose: "AI support for staff working in Microsoft 365, including authorized email, meeting, file, and web context where the product and license allow it.",
+    features: ["Copilot Chat and prompt-based drafting", "Outlook thread summaries with source links/citations where available", "Drafting and coaching in Outlook where licensed", "Meeting preparation using content the signed-in user is allowed to access"],
+    jobs: ["Summarize long Outlook threads", "Prepare for meetings", "Create weekly operations briefs", "Source-grounded research and board preparation"],
+    open: "https://m365.cloud.microsoft/chat",
+    learn: "https://support.microsoft.com/microsoft-365-copilot",
+    ai: "Copilot capabilities vary by license, application, administrator configuration, and user permissions. Do not assume it can access a file, email, meeting, or tenant source unless that content is actually available to the signed-in user.",
+  },
+  {
     name: "NotebookLM",
+    vendor: "Google",
     domain: "notebooklm.google.com",
     icon: "https://www.google.com/s2/favicons?sz=64&domain_url=https://notebooklm.google.com",
     purpose: "Ask questions across a controlled set of approved source documents and keep answers tied to those sources.",
@@ -134,14 +168,14 @@ export default function GoogleWorkspaceHub() {
     <section className="ggw-google-hub" id="google-workspace">
       <div className="ggw-google-hub-head">
         <div>
-          <span><Sparkles size={15} /> GOOGLE WORKSPACE + AI</span>
-          <h2>Know the tool. Open it. Use the feature that matters.</h2>
-          <p>These are the Google tools GGW can use every day. Each card connects the tool to actual nonprofit work instead of listing features without context.</p>
+          <span><Sparkles size={15} /> PRODUCTIVITY TOOLS + AI</span>
+          <h2>Use the tools GGW staff actually work in.</h2>
+          <p>Google Workspace is the primary environment, while Outlook and Microsoft Copilot are supported for staff who work in Microsoft 365. Each card connects the tool to actual GGW nonprofit work and calls out when AI functionality depends on licensing or administrator settings.</p>
         </div>
       </div>
 
       <div className="ggw-google-grid">
-        {googleTools.map((tool) => (
+        {productivityTools.map((tool) => (
           <article className="ggw-google-card" key={tool.name}>
             <div className="ggw-google-card-title">
               <span className="ggw-google-product-icon" style={{ backgroundImage: `url("${tool.icon}")` }} aria-hidden="true" />
@@ -170,7 +204,7 @@ export default function GoogleWorkspaceHub() {
             <div className="ggw-google-actions">
               <a href={tool.open} target="_blank" rel="noreferrer"><ExternalLink size={13} />Open {tool.name}</a>
               {tool.create && <a href={tool.create} target="_blank" rel="noreferrer">{tool.createLabel}</a>}
-              <a className="secondary" href={tool.learn} target="_blank" rel="noreferrer">Google help</a>
+              <a className="secondary" href={tool.learn} target="_blank" rel="noreferrer">{tool.vendor} help</a>
             </div>
           </article>
         ))}
